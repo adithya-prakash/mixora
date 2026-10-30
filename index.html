@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -382,18 +382,74 @@ $("#revpick").onchange=async e=>{const file=e.target.files[0];e.target.value="";
  catch(error){out.textContent="Revision comparison failed: "+error.message;}};
 
 function say(text,who){const bubble=document.createElement("div");bubble.className="bub "+who;bubble.textContent=text;$("#chat").append(bubble);$("#chat").scrollTop=$("#chat").scrollHeight;return bubble;}
-async function ask(question){const text=question.trim();if(!text)return;if(!state.data?.id)return toast("Analyze a mix first");say(text,"u");const answer=say("Checking measured results…","a");$("#send").disabled=true;
- try{const response=await api.ask(state.data.id,text);answer.textContent=response.text;if(response.audio_url)new Audio(response.audio_url).play();}
- catch(error){answer.textContent="Question failed: "+error.message;}
- finally{$("#send").disabled=false;}}
+function speakAnswer(text) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 1.05;
+  utt.pitch = 1.0;
+  const voices = window.speechSynthesis.getVoices();
+  const natural = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Jenny") || v.name.includes("Guy")));
+  if (natural) utt.voice = natural;
+  window.speechSynthesis.speak(utt);
+}
+if ('speechSynthesis' in window) { window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices(); }
+
+async function ask(question){
+  const text=question.trim();
+  if(!text) return;
+  if(!state.data?.id) return toast("Analyze a mix first");
+  say(text,"u");
+  const answer=say("Analyzing with Voice AI...","a");
+  $("#send").disabled=true;
+  try{
+    const response=await api.ask(state.data.id,text);
+    answer.textContent=response.text;
+    if(response.audio_url){ new Audio(response.audio_url).play(); }
+    else { speakAnswer(response.text); }
+  } catch(error){
+    answer.textContent="Voice AI query failed: "+error.message;
+  } finally{
+    $("#send").disabled=false;
+  }
+}
 $("#send").onclick=()=>{const question=$("#q").value;$("#q").value="";ask(question);};
 $("#q").onkeydown=e=>{if(e.key==="Enter"){$("#send").click();}};
-const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;let recognition=null;
-$("#mic").onclick=()=>{if(!SpeechRecognition){$("#mst").textContent="Speech capture is unavailable in this browser. Type a question instead.";return;}
- if(recognition){recognition.stop();return;}recognition=new SpeechRecognition();recognition.onresult=e=>ask(e.results[0][0].transcript);
- recognition.onend=()=>{recognition=null;$("#mic").classList.remove("rec");$("#mst").textContent="Tap to ask about this analysis";};
- recognition.onerror=()=>{$("#mst").textContent="Microphone unavailable or permission denied.";};
- recognition.start();$("#mic").classList.add("rec");$("#mst").textContent="Listening…";};
+
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+let recognition=null;
+$("#mic").onclick=()=>{
+  if(!SpeechRecognition){
+    $("#mst").textContent="Speech capture is unavailable in this browser. Type a question instead.";
+    return;
+  }
+  if(recognition){
+    recognition.stop();
+    return;
+  }
+  if('speechSynthesis' in window) window.speechSynthesis.cancel();
+  recognition=new SpeechRecognition();
+  recognition.lang="en-US";
+  recognition.interimResults=false;
+  recognition.onresult=e=>{
+    const heard = e.results[0][0].transcript;
+    $("#mst").textContent="Heard: \"" + heard + "\"";
+    ask(heard);
+  };
+  recognition.onend=()=>{
+    recognition=null;
+    $("#mic").classList.remove("rec");
+    $("#mst").textContent="Tap mic to speak with Mixora Voice AI";
+  };
+  recognition.onerror=()=>{
+    recognition=null;
+    $("#mic").classList.remove("rec");
+    $("#mst").textContent="Microphone unavailable or permission denied.";
+  };
+  recognition.start();
+  $("#mic").classList.add("rec");
+  $("#mst").textContent="Listening... speak your question now";
+};
 
 function fillStrips(d){const reference=d.ref||null;const column=(key,index,label,color,peak,rms,values)=>{const track=T[key],available=track.avail&&Array.isArray(values);
  return `<div class="col ${available?"":"off"}" data-k="${key}" style="--cc:${color}"><div class="ch" style="background:${color}" data-view="${key}">${index} · ${label}</div>
