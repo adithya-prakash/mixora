@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mixora.local/schemas/api-contract-v1.schema.json",
+  "title": "Mixora POST /analyze response",
+  "type": "object",
+  "required": [
+    "id",
+    "meta",
+    "peak",
+    "rms",
+    "lufs",
+    "lra",
+    "crest",
+    "clipping",
+    "clipping_detail",
+    "bands",
+    "bands_full",
+    "settings",
+    "spectrum",
+    "eq",
+    "stereo",
+    "obs"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "meta": {
+      "type": "object",
+      "required": ["filename", "duration_s", "sample_rate", "channels", "genre", "profile"],
+      "properties": {
+        "filename": { "type": "string" },
+        "duration_s": { "type": "number", "exclusiveMinimum": 0, "maximum": 900 },
+        "sample_rate": { "type": "integer", "minimum": 1 },
+        "channels": { "type": "integer", "minimum": 1 },
+        "genre": {
+          "enum": ["Dubstep", "Bass House", "Pop", "Rock", "Hip Hop", "EDM", "Techno", "Drum & Bass", "Trap", "Lo-fi", "R&B", "Indie"]
+        },
+        "profile": { "enum": ["validated", "generic-v0"] }
+      },
+      "additionalProperties": true
+    },
+    "peak": { "type": "number" },
+    "true_peak": { "type": "number" },
+    "rms": { "type": "number" },
+    "lufs": { "type": "number" },
+    "lra": { "type": "number", "minimum": 0 },
+    "crest": { "type": "number" },
+    "clipping": { "type": "boolean" },
+    "clipping_detail": {
+      "type": "object",
+      "required": ["count", "percent_samples", "max_run"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "percent_samples": { "type": "number", "minimum": 0, "maximum": 1 },
+        "max_run": { "type": "integer", "minimum": 0 },
+        "true_peak_over_dbTP": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "bands": { "$ref": "#/$defs/displayBands" },
+    "bands_full": { "$ref": "#/$defs/fullBands" },
+    "spectrum": {
+      "type": "object",
+      "required": ["A"],
+      "properties": {
+        "A": { "$ref": "#/$defs/spectrumPoints" },
+        "B": { "$ref": "#/$defs/spectrumPoints" }
+      },
+      "additionalProperties": false
+    },
+    "eq": {
+      "type": "object",
+      "required": ["A"],
+      "properties": {
+        "A": { "$ref": "#/$defs/eqBands" },
+        "B": { "$ref": "#/$defs/eqBands" }
+      },
+      "additionalProperties": false
+    },
+    "stereo": {
+      "type": "object",
+      "required": ["balance", "correlation", "width", "mono"],
+      "properties": {
+        "balance": { "type": "number" },
+        "correlation": { "type": "number", "minimum": -1, "maximum": 1 },
+        "width": { "type": "number", "minimum": 0, "maximum": 1 },
+        "mono": { "enum": ["OK", "CAUTION", "PROBLEM"] }
+      },
+      "additionalProperties": true
+    },
+    "ref": { "$ref": "#/$defs/reference" },
+    "obs": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "settings": {
+      "type": "object",
+      "required": ["analysis_sample_rate", "fft_size", "window", "overlap", "spectrum_db_floor", "spectrum_db_ceiling"],
+      "properties": {
+        "analysis_sample_rate": { "const": 44100 },
+        "fft_size": { "const": 8192 },
+        "window": { "const": "hann" },
+        "overlap": { "const": 0.5 },
+        "spectrum_db_floor": { "const": -90 },
+        "spectrum_db_ceiling": { "const": -20 }
+      },
+      "additionalProperties": true
+    }
+  },
+  "allOf": [
+    {
+      "if": { "required": ["ref"] },
+      "then": {
+        "properties": {
+          "spectrum": { "required": ["B"] },
+          "eq": { "required": ["B"] }
+        }
+      }
+    }
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "bandPair": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "string" },
+        { "type": "number", "minimum": 0, "maximum": 100 }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "namedBandPair": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "string" },
+        { "type": "number", "minimum": 0, "maximum": 100 }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "displayBands": {
+      "type": "array",
+      "prefixItems": [
+        { "allOf": [{ "$ref": "#/$defs/namedBandPair" }, { "prefixItems": [{ "const": "Sub-bass" }] }] },
+        { "allOf": [{ "$ref": "#/$defs/namedBandPair" }, { "prefixItems": [{ "const": "Bass" }] }] },
+        { "allOf": [{ "$ref": "#/$defs/namedBandPair" }, { "prefixItems": [{ "const": "Midrange" }] }] },
+        { "allOf": [{ "$ref": "#/$defs/namedBandPair" }, { "prefixItems": [{ "const": "Highs" }] }] }
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "fullBands": {
+      "type": "array",
+      "prefixItems": [
+        { "allOf": [{ "$ref": "#/$defs/namedBandPair" }, { "prefixItems": [{ "const": "Sub-bass" }] }] },
+        { "allOf": [{ "$ref": "#/$defs/namedBandPair" }, { "prefixItems": [{ "const": "Bass" }] }] },
+        { "allOf": [{ "$ref": "#/$defs/namedBandPair" }, { "prefixItems": [{ "const": "Midrange" }] }] },
+        { "allOf": [{ "$ref": "#/$defs/namedBandPair" }, { "prefixItems": [{ "const": "High-mid" }] }] },
+        { "allOf": [{ "$ref": "#/$defs/namedBandPair" }, { "prefixItems": [{ "const": "Highs" }] }] }
+      ],
+      "items": false,
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "spectrumPoints": {
+      "type": "array",
+      "items": { "type": "number", "minimum": 0, "maximum": 1 },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "eqBand": {
+      "type": "object",
+      "required": ["t", "f", "g", "q"],
+      "properties": {
+        "t": { "enum": ["hpf", "ls", "bell", "hs", "lpf"] },
+        "f": { "type": "number", "minimum": 20, "maximum": 20000 },
+        "g": { "type": "number", "minimum": -18, "maximum": 18 },
+        "q": { "type": "number", "minimum": 0.3, "maximum": 8 }
+      },
+      "additionalProperties": false
+    },
+    "eqBands": {
+      "type": "array",
+      "prefixItems": [
+        { "allOf": [{ "$ref": "#/$defs/eqBand" }, { "properties": { "t": { "const": "hpf" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/eqBand" }, { "properties": { "t": { "const": "ls" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/eqBand" }, { "properties": { "t": { "const": "bell" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/eqBand" }, { "properties": { "t": { "const": "bell" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/eqBand" }, { "properties": { "t": { "const": "bell" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/eqBand" }, { "properties": { "t": { "const": "bell" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/eqBand" }, { "properties": { "t": { "const": "hs" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/eqBand" }, { "properties": { "t": { "const": "lpf" } } }] }
+      ],
+      "items": false,
+      "minItems": 8,
+      "maxItems": 8
+    },
+    "reference": {
+      "type": "object",
+      "required": ["peak", "rms", "lufs", "lra", "crest", "corr", "width", "bands"],
+      "properties": {
+        "peak": { "type": "number" },
+        "rms": { "type": "number" },
+        "lufs": { "type": "number" },
+        "lra": { "type": "number", "minimum": 0 },
+        "crest": { "type": "number" },
+        "corr": { "type": "number", "minimum": -1, "maximum": 1 },
+        "width": { "type": "number", "minimum": 0, "maximum": 1 },
+        "bands": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0, "maximum": 100 },
+          "minItems": 4,
+          "maxItems": 4
+        }
+      },
+      "additionalProperties": true
+    },
+    "observation": {
+      "type": "object",
+      "required": ["id", "t", "p", "c", "conf", "ev", "ex", "a", "evidence_fields"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "t": { "type": "string" },
+        "p": { "enum": ["High", "Medium", "Low"] },
+        "c": { "enum": ["confirmed", "potential"] },
+        "conf": { "enum": ["High", "Medium", "Low"] },
+        "ev": { "type": "string" },
+        "ex": { "type": "string" },
+        "a": { "type": "string" },
+        "evidence_fields": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    }
+  }
+}
