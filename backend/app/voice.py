@@ -128,15 +128,12 @@ def _ask_gemini(
         },
         "contents": contents,
         "generationConfig": {
-            "thinkingConfig": {
-                "thinkingBudget": 0
-            },
             "maxOutputTokens": 300,
         }
     }
     encoded_payload = json.dumps(payload).encode("utf-8")
 
-    last_err = None
+    errors: list[str] = []
 
     for model in PRIMARY_MODELS:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
@@ -150,7 +147,7 @@ def _ask_gemini(
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=35) as response:
+            with urllib.request.urlopen(req, timeout=20) as response:
                 res_data = json.loads(response.read().decode("utf-8"))
                 candidates = res_data.get("candidates", [])
                 if candidates:
@@ -167,14 +164,16 @@ def _ask_gemini(
                         logger.info("Generated reply using %s (%s chars)", model, len(full_reply))
                         return full_reply, None
         except urllib.error.HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="replace")[:300]
-            last_err = f"HTTP {exc.code} on {model}: {body}"
-            logger.warning("Gemini model %s failed: %s", model, last_err)
+            body = exc.read().decode("utf-8", errors="replace")[:200]
+            err_msg = f"{model} (HTTP {exc.code}): {body}"
+            errors.append(err_msg)
+            logger.warning("Gemini model %s failed: %s", model, err_msg)
         except Exception as exc:
-            last_err = f"{model} error: {exc}"
+            err_msg = f"{model} error: {exc}"
+            errors.append(err_msg)
             logger.warning("Gemini error on %s: %s", model, exc)
 
-    return None, last_err
+    return None, " | ".join(errors)
 
 
 # ---------------------------------------------------------------------------
