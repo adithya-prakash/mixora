@@ -128,7 +128,7 @@ def _ask_gemini(
         "contents": contents,
         "generationConfig": {
             "thinkingConfig": {
-                "thinkingLevel": "LOW"
+                "thinkingBudget": 0
             },
             "maxOutputTokens": 300,
         }
@@ -149,7 +149,7 @@ def _ask_gemini(
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=25) as response:
+            with urllib.request.urlopen(req, timeout=35) as response:
                 res_data = json.loads(response.read().decode("utf-8"))
                 candidates = res_data.get("candidates", [])
                 if candidates:
