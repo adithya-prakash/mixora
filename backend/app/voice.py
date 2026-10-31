@@ -10,7 +10,7 @@ from typing import Any
 logger = logging.getLogger("mixora.voice")
 
 # ---------------------------------------------------------------------------
-# Build a rich context string from the analysis data so Gemini has full facts
+# Build a rich context string from the analysis data so LLM has full facts
 # ---------------------------------------------------------------------------
 
 def _build_context(analysis: dict[str, Any]) -> str:
@@ -25,67 +25,77 @@ def _build_context(analysis: dict[str, Any]) -> str:
     obs_lines = "\n".join(
         f"  - [{o.get('confidence','?').upper()}] {o.get('title','')}: {o.get('detail','')}"
         for o in observations
-    ) or "  None flagged."
+    ) or "  None flagged (mix is technically within standard ranges)."
 
     bands_str = ", ".join(f"{b[0]}: {b[1]:.1f}%" for b in bands) if bands else "N/A"
     bands_full_str = ", ".join(f"{b[0]}: {b[1]:.1f}%" for b in bands_full) if bands_full else "N/A"
 
-    return f"""=== TRACK ANALYSIS ===
-Genre: {meta.get('genre', 'Unknown')}
+    return f"""=== TRACK TECHNICAL ANALYSIS ===
+Target Genre: {meta.get('genre', 'Unknown')}
 Filename: {meta.get('filename', 'Unknown')}
-Duration: {meta.get('duration_s', '?')}s
-Sample Rate: {meta.get('sample_rate', '?')} Hz
+Duration: {meta.get('duration_s', '?')} seconds
 Channels: {meta.get('channels', '?')}
 
-=== LOUDNESS & DYNAMICS ===
-Peak: {analysis.get('peak', 'N/A')} dBFS
-RMS: {analysis.get('rms', 'N/A')} dBFS
-Integrated Loudness: {analysis.get('lufs', 'N/A')} LUFS
-Loudness Range (LRA): {analysis.get('lra', 'N/A')} LU
-Crest Factor: {analysis.get('crest', 'N/A')} dB
+LOUDNESS & DYNAMICS:
+- Integrated Loudness: {analysis.get('lufs', 'N/A')} LUFS
+- Peak: {analysis.get('peak', 'N/A')} dBFS
+- RMS: {analysis.get('rms', 'N/A')} dBFS
+- Dynamic Range (LRA): {analysis.get('lra', 'N/A')} LU
+- Crest Factor: {analysis.get('crest', 'N/A')} dB
 
-=== CLIPPING ===
-Clipping Detected: {clipping}
-Clipped Samples: {clip_detail.get('count', 0)}
-Longest Clip Run: {clip_detail.get('max_run', 0)} samples
+CLIPPING:
+- Clipping detected: {clipping}
+- Clipped sample count: {clip_detail.get('count', 0)}
+- Longest consecutive clip: {clip_detail.get('max_run', 0)} samples
 
-=== FREQUENCY BANDS (Display) ===
-{bands_str}
+FREQUENCY SPECTRUM ENERGY:
+- Main Bands: {bands_str}
+- Detailed Breakdown: {bands_full_str}
 
-=== FREQUENCY BANDS (Full Detail) ===
-{bands_full_str}
+STEREO FIELD:
+- Correlation: {stereo.get('correlation', 'N/A')} (-1.0 = out of phase, 0.0 = wide stereo, +1.0 = pure mono)
+- Stereo Width: {stereo.get('width', 'N/A')} (0.0 = mono, 1.0 = wide)
+- Balance L/R: {stereo.get('balance', 'N/A')} dB
+- Mono Compatibility: {stereo.get('mono', 'N/A')}
 
-=== STEREO ===
-Correlation: {stereo.get('correlation', 'N/A')} (-1=antiphase, 0=unrelated, 1=mono/perfect)
-Width: {stereo.get('width', 'N/A')} (0=mono, 1=max width)
-Balance (L vs R): {stereo.get('balance', 'N/A')} dB
-Mono Compatibility: {stereo.get('mono', 'N/A')} (OK / CAUTION / PROBLEM)
-
-=== OBSERVATIONS (Flagged Issues) ===
+FLAGGED OBSERVATIONS:
 {obs_lines}
 """
 
 
 # ---------------------------------------------------------------------------
-# Call Google Gemini with full conversation history
+# Call Google Gemini API
 # ---------------------------------------------------------------------------
+
+def _get_api_key() -> str:
+    """Check common environment variable names for Google/Gemini key."""
+    for var in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_KEY", "GOOGLE_AI_KEY"):
+        val = os.getenv(var, "").strip()
+        if val:
+            return val
+    return ""
+
 
 def _ask_gemini(
     context: str,
     question: str,
     history: list[dict[str, str]],
     api_key: str,
-) -> str | None:
+) -> tuple[str | None, str | None]:
     """
-    Send a conversation turn to Gemini Flash with full history.
-    history = list of {"role": "user"|"assistant", "text": "..."}
-    Tries gemini-1.5-flash first, falls back to gemini-1.0-pro on failure.
+    Sends conversation turn to Gemini.
+    Returns (response_text, error_message).
     """
-    for model in ("gemini-1.5-flash", "gemini-1.0-pro"):
-        result = _try_gemini_model(model, context, question, history, api_key)
-        if result:
-            return result
-    return None
+    models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    last_err = None
+
+    for model in models:
+        text, err = _try_gemini_model(model, context, question, history, api_key)
+        if text:
+            return text, None
+        last_err = err
+
+    return None, last_err
 
 
 def _try_gemini_model(
@@ -94,63 +104,47 @@ def _try_gemini_model(
     question: str,
     history: list[dict[str, str]],
     api_key: str,
-) -> str | None:
+) -> tuple[str | None, str | None]:
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model}:generateContent?key={api_key}"
     )
 
     system_instruction = (
-        "You are Mixora, an expert AI mixing and mastering engineer having a natural spoken conversation "
-        "with a music producer about their track. You have the full technical analysis below. "
-        "Answer every question directly and naturally, like a knowledgeable studio engineer talking in person. "
-        "Keep answers to 2-4 sentences — short enough to be spoken aloud. "
-        "Never use markdown, bullet points, asterisks or bold text — your response will be read by text-to-speech. "
-        "Answer ANY question: genre fit, emotional feel, what to fix, how it compares to other songs, "
-        "mixing advice, mastering, distribution loudness targets, or anything else the producer asks. "
-        "Always refer to specific numbers from the analysis when relevant. "
-        "Each question must get a UNIQUE, specific answer — never repeat the same response.\n\n"
+        "You are Mixora, a top-tier music mixing and mastering engineer speaking directly with the producer. "
+        "You have the full technical audio analysis of their track below. "
+        "Talk like a real human engineer in a recording studio — conversational, reactive, insightful, and natural. "
+        "Answer ANY question they ask: emotional vibe, genre comparison, frequency issues, how to fix things, "
+        "arrangement, loudness for Spotify/Apple Music, or creative production ideas. "
+        "Keep each answer to 2-4 spoken sentences so it sounds great over audio. "
+        "Do NOT use markdown, bold, asterisks, bullet points, or lists because your answer is spoken out loud. "
+        "Be specific to their actual numbers and observations.\n\n"
         f"{context}"
     )
 
-    # Build Gemini multi-turn contents array
-    contents: list[dict] = []
+    contents: list[dict] = [
+        {"role": "user", "parts": [{"text": system_instruction}]},
+        {"role": "model", "parts": [{"text": "Understood! I'm loaded with the full mix details and ready to chat about the track."}]}
+    ]
 
-    # System context as first turn pair
-    contents.append({
-        "role": "user",
-        "parts": [{"text": system_instruction}],
-    })
-    contents.append({
-        "role": "model",
-        "parts": [{"text": "Got it, I have the full analysis loaded and I'm ready to give specific advice about this track."}],
-    })
-
-    # Replay conversation history
     for turn in history:
         role = "model" if turn.get("role") == "assistant" else "user"
         contents.append({
             "role": role,
-            "parts": [{"text": turn.get("text", "")}],
+            "parts": [{"text": turn.get("text", "")}]
         })
 
-    # Add the current question
     contents.append({
         "role": "user",
-        "parts": [{"text": question}],
+        "parts": [{"text": question}]
     })
 
     payload = {
         "contents": contents,
         "generationConfig": {
-            "temperature": 0.8,
+            "temperature": 0.85,
             "maxOutputTokens": 300,
-            "stopSequences": [],
-        },
-        "safetySettings": [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-        ],
+        }
     }
 
     try:
@@ -160,136 +154,23 @@ def _try_gemini_model(
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=20) as response:
+        with urllib.request.urlopen(req, timeout=15) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             candidates = res_data.get("candidates", [])
             if candidates:
-                finish_reason = candidates[0].get("finishReason", "")
                 parts = candidates[0].get("content", {}).get("parts", [])
                 if parts:
                     text = parts[0].get("text", "").strip()
                     if text:
-                        logger.info("Gemini %s answered (%s chars, finish=%s)", model, len(text), finish_reason)
-                        return text
-            logger.warning("Gemini %s: empty candidates. Full response: %s", model, json.dumps(res_data)[:400])
+                        return text, None
+            return None, "Empty response from Gemini"
     except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")[:500]
+        body = exc.read().decode("utf-8", errors="replace")[:300]
         logger.warning("Gemini %s HTTP %s: %s", model, exc.code, body)
+        return None, f"HTTP {exc.code}: {body}"
     except Exception as exc:
         logger.warning("Gemini %s error: %s", model, exc)
-
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Fallback: smart keyword-based deterministic response (no AI key needed)
-# ---------------------------------------------------------------------------
-
-def _fallback_answer(analysis: dict[str, Any], question: str) -> str:
-    n = question.casefold()
-
-    if any(t in n for t in ("clip", "distort", "peak", "limit")):
-        c = analysis.get("clipping_detail", {})
-        if analysis.get("clipping"):
-            return (
-                f"Your track is clipping with {c.get('count', 0)} samples hitting digital zero, "
-                f"and the longest run is {c.get('max_run', 0)} consecutive samples. "
-                "Pull back your master fader or limiter ceiling to fix this before export."
-            )
-        return (
-            f"Your sample peak is {analysis.get('peak', 'N/A')} dBFS with no hard clipping detected. "
-            "Keep watching for inter-sample true peaks when exporting for streaming."
-        )
-
-    if any(t in n for t in ("sub", "bass", "low end", "low-end", "low freq", "frequency", "eq", "equaliz")):
-        b = analysis.get("bands_full", [])
-        sub = b[0][1] if b else 0
-        bass = b[1][1] if len(b) > 1 else 0
-        return (
-            f"Your sub-bass sits at {sub:.1f}% and bass at {bass:.1f}% of total spectral energy. "
-            "Check kick and bass together in mono to avoid masking in the low end."
-        )
-
-    if any(t in n for t in ("stereo", "mono", "width", "correlation", "phase", "wide", "narrow")):
-        s = analysis.get("stereo", {})
-        return (
-            f"Stereo correlation is {s.get('correlation', 'N/A'):.2f} and width is {s.get('width', 'N/A'):.2f}. "
-            f"Mono compatibility check: {s.get('mono', 'N/A')}. "
-            "Use a correlation meter and check how it sounds in mono on a phone speaker."
-        )
-
-    if any(t in n for t in ("loud", "lufs", "volume", "dynamic", "crest", "range", "quiet", "spotify", "streaming", "apple", "youtube")):
-        return (
-            f"Integrated loudness is {analysis.get('lufs', 'N/A')} LUFS with a crest factor of {analysis.get('crest', 'N/A')} dB. "
-            "Spotify targets -14 LUFS, Apple Music -16 LUFS, and YouTube -13 LUFS. "
-            "If you are louder than the target, streaming platforms will turn you down automatically."
-        )
-
-    if any(t in n for t in ("genre", "style", "sound like", "good for", "suitable", "work for")):
-        g = analysis.get("meta", {}).get("genre", "this genre")
-        lufs = analysis.get("lufs", "N/A")
-        return (
-            f"Your track is labelled {g} with loudness at {lufs} LUFS. "
-            f"Genre fit depends on how the energy distribution and stereo width compare to reference tracks in the same genre. "
-            "Try uploading a reference track in the Reference tab for a direct comparison."
-        )
-
-    if any(t in n for t in ("wrong", "problem", "issue", "fix", "bad", "improve", "advice")):
-        obs_list = analysis.get("obs", [])
-        if obs_list:
-            flagged = [o.get("title", "") for o in obs_list[:3]]
-            return (
-                f"The analysis flagged these potential issues: {', '.join(flagged)}. "
-                "These are starting points for your ears to investigate, not definitive problems."
-            )
-        return "No significant issues were flagged automatically. The mix looks technically clean across loudness, clipping, and stereo measurements."
-
-    if any(t in n for t in ("differ", "compare", "other song", "different song", "vs", "versus", "better", "worse")):
-        g = analysis.get("meta", {}).get("genre", "this genre")
-        lufs = analysis.get("lufs", "N/A")
-        peak = analysis.get("peak", "N/A")
-        s = analysis.get("stereo", {})
-        return (
-            f"Compared to typical {g} releases, your track hits {lufs} LUFS integrated loudness and {peak} dBFS peak. "
-            f"Most commercial {g} tracks sit between -8 and -6 LUFS with wide stereo fields. "
-            f"Your stereo width is {s.get('width', 'N/A'):.2f} — upload a reference track in the Reference tab to see exact differences."
-        )
-
-    if any(t in n for t in ("how", "why", "what", "explain", "tell", "describe")):
-        obs_list = analysis.get("obs", [])
-        g = analysis.get("meta", {}).get("genre", "your genre")
-        lufs = analysis.get("lufs", "N/A")
-        lra = analysis.get("lra", "N/A")
-        if obs_list:
-            top = obs_list[0]
-            return (
-                f"{top.get('title', 'The top observation')}: {top.get('detail', '')} "
-                f"Overall the track is {lufs} LUFS with {lra} LU of dynamic range, which is typical context for {g}."
-            )
-        return (
-            f"This {g} mix measures {lufs} LUFS integrated loudness and {lra} LU dynamic range. "
-            "The frequency balance, stereo width, and dynamics all look within expected ranges. "
-            "Ask me about a specific area — bass, loudness, stereo, or clipping — for targeted advice."
-        )
-
-    # Final fallback — still give unique info rather than generic
-    g = analysis.get("meta", {}).get("genre", "your track")
-    lufs = analysis.get("lufs", "N/A")
-    lra = analysis.get("lra", "N/A")
-    s = analysis.get("stereo", {})
-    obs_list = analysis.get("obs", [])
-    if obs_list:
-        top_issue = obs_list[0].get("title", "")
-        return (
-            f"For this {g} mix: loudness is {lufs} LUFS, dynamic range is {lra} LU, "
-            f"and the top flagged issue is '{top_issue}'. "
-            "Ask me specifically about loudness, clipping, bass, stereo width, genre fit, or what to fix."
-        )
-    return (
-        f"This {g} mix has {lufs} LUFS integrated loudness, {lra} LU dynamic range, "
-        f"and stereo width of {s.get('width', 'N/A'):.2f}. No major issues were flagged. "
-        "Ask me about loudness, clipping, bass, stereo, or genre fit for specific advice."
-    )
+        return None, str(exc)
 
 
 # ---------------------------------------------------------------------------
@@ -301,22 +182,33 @@ def answer_question(
     question: str,
     history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    api_key = _get_api_key()
     context = _build_context(analysis)
 
-    if gemini_key:
-        ai_text = _ask_gemini(context, question, history or [], gemini_key)
-        if ai_text:
-            return {
-                "text": ai_text,
-                "source": "gemini",
-                "used_fields": ["ai_gemini"],
-            }
-        logger.warning("Gemini failed for question: %r — using fallback", question)
+    if not api_key:
+        return {
+            "text": (
+                "To talk with me like a real AI assistant, add your GEMINI_API_KEY in your Render Dashboard. "
+                "Go to mixora-api, click Environment, and add GEMINI_API_KEY with your key from Google AI Studio. "
+                "Once saved, I will chat with you naturally in real-time."
+            ),
+            "source": "no_key",
+            "used_fields": ["auth"],
+        }
 
-    # Deterministic fallback when no key or API failure
+    ai_text, error = _ask_gemini(context, question, history or [], api_key)
+    if ai_text:
+        return {
+            "text": ai_text,
+            "source": "gemini",
+            "used_fields": ["ai_gemini"],
+        }
+
     return {
-        "text": _fallback_answer(analysis, question),
-        "source": "fallback",
-        "used_fields": ["analysis"],
+        "text": (
+            f"AI connection error ({error or 'Request timed out'}). "
+            "Please check that your GEMINI_API_KEY in Render is valid and has active quota at aistudio.google.com."
+        ),
+        "source": "error",
+        "used_fields": ["error"],
     }
