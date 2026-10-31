@@ -9,11 +9,10 @@ from typing import Any
 
 logger = logging.getLogger("mixora.voice")
 
-# Candidate models in priority order — direct endpoints without slow ListModels preliminary calls
-CANDIDATE_MODELS = (
-    "v1beta/models/gemini-3.8-flash",
-    "v1beta/models/gemini-2.0-flash",
-    "v1beta/models/gemini-1.5-flash",
+# Supported models in Google Gemini API
+PRIMARY_MODELS = (
+    "gemini-3.8-flash",
+    "gemini-2.5-flash",
 )
 
 
@@ -85,7 +84,7 @@ def _get_api_key() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Call Gemini directly (fast, no intermediate ListModels latency)
+# Call Gemini via official REST structure
 # ---------------------------------------------------------------------------
 
 def _ask_gemini(
@@ -106,61 +105,71 @@ def _ask_gemini(
         f"{context}"
     )
 
-    contents: list[dict] = [
-        {"role": "user", "parts": [{"text": system_instruction}]},
-        {"role": "model", "parts": [{"text": "Understood! I'm loaded with the full mix details and ready to chat naturally about the track."}]}
-    ]
-
-    # Include recent history turns (keep last 6 for speed and low token latency)
+    # Build properly alternating conversation turns
+    contents: list[dict] = []
     for turn in history[-6:]:
         role = "model" if turn.get("role") == "assistant" else "user"
-        contents.append({
-            "role": role,
-            "parts": [{"text": turn.get("text", "")}]
-        })
+        text = turn.get("text", "").strip()
+        if not text:
+            continue
+        if contents and contents[-1]["role"] == role:
+            contents[-1]["parts"][0]["text"] += "\n" + text
+        else:
+            contents.append({"role": role, "parts": [{"text": text}]})
 
-    contents.append({
-        "role": "user",
-        "parts": [{"text": question}]
-    })
+    if contents and contents[-1]["role"] == "user":
+        contents[-1]["parts"][0]["text"] += "\n" + question
+    else:
+        contents.append({"role": "user", "parts": [{"text": question}]})
 
     payload = {
+        "systemInstruction": {
+            "parts": [{"text": system_instruction}]
+        },
         "contents": contents,
         "generationConfig": {
-            "temperature": 0.8,
-            "maxOutputTokens": 250,
+            "maxOutputTokens": 300,
         }
     }
     encoded_payload = json.dumps(payload).encode("utf-8")
 
     last_err = None
 
-    for model_path in CANDIDATE_MODELS:
-        url = f"https://generativelanguage.googleapis.com/{model_path}:generateContent?key={api_key}"
+    for model in PRIMARY_MODELS:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         try:
             req = urllib.request.Request(
                 url,
                 data=encoded_payload,
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": api_key,
+                },
                 method="POST",
             )
-            # Fast 8-second timeout for responsive real-time voice chat
-            with urllib.request.urlopen(req, timeout=8) as response:
+            with urllib.request.urlopen(req, timeout=12) as response:
                 res_data = json.loads(response.read().decode("utf-8"))
                 candidates = res_data.get("candidates", [])
                 if candidates:
                     parts = candidates[0].get("content", {}).get("parts", [])
-                    if parts:
-                        text = parts[0].get("text", "").strip()
-                        if text:
-                            return text, None
+                    # Extract spoken text pieces (ignoring any thought reasoning blocks)
+                    text_pieces = []
+                    for p in parts:
+                        if not p.get("thought", False):
+                            t = p.get("text", "").strip()
+                            if t:
+                                text_pieces.append(t)
+                    if text_pieces:
+                        full_reply = " ".join(text_pieces)
+                        logger.info("Generated reply using %s (%s chars)", model, len(full_reply))
+                        return full_reply, None
         except urllib.error.HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="replace")[:250]
-            last_err = f"HTTP {exc.code}: {body}"
-            logger.warning("Gemini %s failed: %s", model_path, last_err)
+            body = exc.read().decode("utf-8", errors="replace")[:300]
+            last_err = f"HTTP {exc.code} on {model}: {body}"
+            logger.warning("Gemini model %s failed: %s", model, last_err)
         except Exception as exc:
-            last_err = str(exc)
-            logger.warning("Gemini %s error: %s", model_path, last_err)
+            last_err = f"{model} error: {exc}"
+            logger.warning("Gemini error on %s: %s", model, exc)
 
     return None, last_err
 
