@@ -9,8 +9,12 @@ from typing import Any
 
 logger = logging.getLogger("mixora.voice")
 
-# Cached discovered endpoint: "https://generativelanguage.googleapis.com/{version}/{name}:generateContent"
-_DISCOVERED_ENDPOINT: str | None = None
+# Candidate models in priority order — direct endpoints without slow ListModels preliminary calls
+CANDIDATE_MODELS = (
+    "v1beta/models/gemini-3.8-flash",
+    "v1beta/models/gemini-2.0-flash",
+    "v1beta/models/gemini-1.5-flash",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -81,75 +85,7 @@ def _get_api_key() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Dynamic Model Discovery: Ask Google which models are active for this key
-# ---------------------------------------------------------------------------
-
-def _get_candidate_endpoints(api_key: str) -> list[str]:
-    """
-    Returns an ordered list of generateContent endpoint URLs to try.
-    Prioritizes models/gemini-3.8-flash (recommended by Google), filters out deprecated models.
-    """
-    global _DISCOVERED_ENDPOINT
-    if _DISCOVERED_ENDPOINT:
-        return [_DISCOVERED_ENDPOINT]
-
-    discovered = []
-
-    for api_version in ("v1beta", "v1"):
-        list_url = f"https://generativelanguage.googleapis.com/{api_version}/models?key={api_key}"
-        try:
-            req = urllib.request.Request(list_url, method="GET")
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                models = data.get("models", [])
-                for m in models:
-                    methods = m.get("supportedGenerationMethods", [])
-                    name = m.get("name", "")
-                    # Filter out models that don't support generateContent or are deprecated (like 2.5)
-                    if "generateContent" in methods and "2.5" not in name:
-                        discovered.append((name, api_version))
-        except Exception as exc:
-            logger.warning("Listing models failed on %s: %s", api_version, exc)
-
-    # Sorting priority:
-    # 1. gemini-3.8-flash (current generation)
-    # 2. gemini-3-flash / gemini-3
-    # 3. gemini-2.0-flash
-    # 4. gemini-1.5-flash
-    # 5. any other gemini model
-    def _rank(item: tuple[str, str]) -> int:
-        n = item[0].lower()
-        if "gemini-3.8-flash" in n:
-            return 0
-        if "gemini-3" in n and "flash" in n:
-            return 1
-        if "gemini-2.0-flash" in n:
-            return 2
-        if "gemini-1.5-flash" in n:
-            return 3
-        if "flash" in n:
-            return 4
-        if "gemini" in n:
-            return 5
-        return 6
-
-    discovered.sort(key=_rank)
-
-    endpoints = [
-        f"https://generativelanguage.googleapis.com/{ver}/{name}:generateContent"
-        for name, ver in discovered
-    ]
-
-    # Always ensure models/gemini-3.8-flash is at the very top as recommended by Google API
-    recommended = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
-    if recommended not in endpoints:
-        endpoints.insert(0, recommended)
-
-    return endpoints
-
-
-# ---------------------------------------------------------------------------
-# Call Gemini with conversational multi-turn
+# Call Gemini directly (fast, no intermediate ListModels latency)
 # ---------------------------------------------------------------------------
 
 def _ask_gemini(
@@ -158,10 +94,6 @@ def _ask_gemini(
     history: list[dict[str, str]],
     api_key: str,
 ) -> tuple[str | None, str | None]:
-    endpoints = _get_candidate_endpoints(api_key)
-    if not endpoints:
-        return None, "No available Gemini endpoints found for this key"
-
     system_instruction = (
         "You are Mixora, a friendly, top-tier audio mixing and mastering engineer speaking directly with the producer. "
         "You have access to the full technical analysis of their audio file below. "
@@ -179,7 +111,8 @@ def _ask_gemini(
         {"role": "model", "parts": [{"text": "Understood! I'm loaded with the full mix details and ready to chat naturally about the track."}]}
     ]
 
-    for turn in history:
+    # Include recent history turns (keep last 6 for speed and low token latency)
+    for turn in history[-6:]:
         role = "model" if turn.get("role") == "assistant" else "user"
         contents.append({
             "role": role,
@@ -194,24 +127,25 @@ def _ask_gemini(
     payload = {
         "contents": contents,
         "generationConfig": {
-            "temperature": 0.85,
-            "maxOutputTokens": 300,
+            "temperature": 0.8,
+            "maxOutputTokens": 250,
         }
     }
+    encoded_payload = json.dumps(payload).encode("utf-8")
 
     last_err = None
-    global _DISCOVERED_ENDPOINT
 
-    for endpoint in endpoints:
-        url = f"{endpoint}?key={api_key}"
+    for model_path in CANDIDATE_MODELS:
+        url = f"https://generativelanguage.googleapis.com/{model_path}:generateContent?key={api_key}"
         try:
             req = urllib.request.Request(
                 url,
-                data=json.dumps(payload).encode("utf-8"),
+                data=encoded_payload,
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=18) as response:
+            # Fast 8-second timeout for responsive real-time voice chat
+            with urllib.request.urlopen(req, timeout=8) as response:
                 res_data = json.loads(response.read().decode("utf-8"))
                 candidates = res_data.get("candidates", [])
                 if candidates:
@@ -219,17 +153,14 @@ def _ask_gemini(
                     if parts:
                         text = parts[0].get("text", "").strip()
                         if text:
-                            # Cache the successful endpoint for future turns
-                            _DISCOVERED_ENDPOINT = endpoint
-                            logger.info("Successfully generated response using %s", endpoint)
                             return text, None
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")[:250]
             last_err = f"HTTP {exc.code}: {body}"
-            logger.warning("Endpoint %s failed: %s", endpoint, last_err)
+            logger.warning("Gemini %s failed: %s", model_path, last_err)
         except Exception as exc:
             last_err = str(exc)
-            logger.warning("Endpoint %s error: %s", endpoint, last_err)
+            logger.warning("Gemini %s error: %s", model_path, last_err)
 
     return None, last_err
 
@@ -267,7 +198,7 @@ def answer_question(
     return {
         "text": (
             f"AI connection note: {error}. "
-            "Please verify your key in Google AI Studio has access to Gemini Flash."
+            "Please verify your key in Google AI Studio."
         ),
         "source": "error",
         "used_fields": ["error"],

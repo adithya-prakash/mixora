@@ -65,45 +65,36 @@ def _spectrum_power(mono: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return np.fft.rfftfreq(FFT_SIZE, 1.0 / ANALYSIS_SAMPLE_RATE), total
 
 
-def _integrated_and_range(samples: np.ndarray) -> tuple[float, float]:
-    import pyloudnorm as pyln
+_METER = None
 
+
+def _get_meter():
+    global _METER
+    if _METER is None:
+        import pyloudnorm as pyln
+        _METER = pyln.Meter(ANALYSIS_SAMPLE_RATE)
+    return _METER
+
+
+def _integrated_and_range(samples: np.ndarray) -> tuple[float, float]:
+    meter = _get_meter()
     audio = np.asarray(samples, dtype=np.float64)
     if audio.shape[0] < int(0.4 * ANALYSIS_SAMPLE_RATE):
         padding = int(0.4 * ANALYSIS_SAMPLE_RATE) - audio.shape[0]
         audio = np.pad(audio, ((0, padding), (0, 0)))
-    meter = pyln.Meter(ANALYSIS_SAMPLE_RATE)
+
     integrated = float(meter.integrated_loudness(audio))
     if not np.isfinite(integrated):
         integrated = -120.0
 
-    window = 3 * ANALYSIS_SAMPLE_RATE
-    hop = ANALYSIS_SAMPLE_RATE
-    if audio.shape[0] < window:
-        return integrated, 0.0
+    try:
+        lra = float(meter.loudness_range(audio))
+        if not np.isfinite(lra):
+            lra = 0.0
+    except Exception:
+        lra = 0.0
 
-    # Optimization for long songs:
-    # Instead of running the slow IIR filter 300+ times every second across long audio,
-    # sample up to 60 evaluation windows evenly across the track.
-    # This gives 99.9% identical percentile dynamic range (LRA) in 1-2s instead of 30s.
-    total_hops = (audio.shape[0] - window) // hop
-    if total_hops > 60:
-        hop = max(hop, (audio.shape[0] - window) // 60)
-
-    levels: list[float] = []
-    for start in range(0, audio.shape[0] - window + 1, hop):
-        level = float(meter.integrated_loudness(audio[start:start + window]))
-        if np.isfinite(level) and level >= -70.0:
-            levels.append(level)
-    if len(levels) < 2:
-        return integrated, 0.0
-
-    energies = np.power(10.0, np.asarray(levels, dtype=np.float64) / 10.0)
-    relative_gate = 10.0 * np.log10(np.mean(energies)) - 20.0
-    gated = np.asarray(levels)[np.asarray(levels) >= max(-70.0, relative_gate)]
-    if gated.size < 2:
-        return integrated, 0.0
-    return integrated, float(np.percentile(gated, 95) - np.percentile(gated, 10))
+    return integrated, float(round(lra, 2))
 
 
 def _band_percentages(frequencies: np.ndarray, power: np.ndarray) -> tuple[list[list[object]], list[list[object]]]:
