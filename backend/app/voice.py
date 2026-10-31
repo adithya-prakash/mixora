@@ -9,8 +9,12 @@ from typing import Any
 
 logger = logging.getLogger("mixora.voice")
 
+# Cached discovered endpoint: "https://generativelanguage.googleapis.com/{version}/{name}:generateContent"
+_DISCOVERED_ENDPOINT: str | None = None
+
+
 # ---------------------------------------------------------------------------
-# Build a rich context string from the analysis data so LLM has full facts
+# Build rich context string for the AI
 # ---------------------------------------------------------------------------
 
 def _build_context(analysis: dict[str, Any]) -> str:
@@ -64,7 +68,7 @@ FLAGGED OBSERVATIONS:
 
 
 # ---------------------------------------------------------------------------
-# Call Google Gemini API
+# API Key discovery
 # ---------------------------------------------------------------------------
 
 def _get_api_key() -> str:
@@ -76,55 +80,94 @@ def _get_api_key() -> str:
     return ""
 
 
+# ---------------------------------------------------------------------------
+# Dynamic Model Discovery: Ask Google which models are active for this key
+# ---------------------------------------------------------------------------
+
+def _get_generate_url(api_key: str) -> tuple[str | None, str | None]:
+    """
+    Dynamically asks Google API for available models supporting generateContent.
+    Picks the best available model (prefers Flash models).
+    Returns (endpoint_url_with_key, error_message).
+    """
+    global _DISCOVERED_ENDPOINT
+    if _DISCOVERED_ENDPOINT:
+        return f"{_DISCOVERED_ENDPOINT}?key={api_key}", None
+
+    last_error = None
+    for api_version in ("v1beta", "v1"):
+        list_url = f"https://generativelanguage.googleapis.com/{api_version}/models?key={api_key}"
+        try:
+            req = urllib.request.Request(list_url, method="GET")
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                models = data.get("models", [])
+                candidates = []
+                for m in models:
+                    methods = m.get("supportedGenerationMethods", [])
+                    if "generateContent" in methods:
+                        candidates.append((m.get("name", ""), api_version))
+
+                # Preference order:
+                # 1. gemini-2.0-flash
+                # 2. gemini-1.5-flash
+                # 3. any other flash model
+                # 4. gemini-1.5-pro or any gemini
+                # 5. any model with generateContent
+                for pref in ("gemini-2.0-flash", "gemini-1.5-flash", "flash", "gemini-1.5-pro", "gemini"):
+                    for name, ver in candidates:
+                        if pref in name.lower():
+                            _DISCOVERED_ENDPOINT = f"https://generativelanguage.googleapis.com/{ver}/{name}:generateContent"
+                            logger.info("Auto-selected Gemini model: %s via %s", name, ver)
+                            return f"{_DISCOVERED_ENDPOINT}?key={api_key}", None
+
+                if candidates:
+                    name, ver = candidates[0]
+                    _DISCOVERED_ENDPOINT = f"https://generativelanguage.googleapis.com/{ver}/{name}:generateContent"
+                    logger.info("Auto-selected fallback model: %s via %s", name, ver)
+                    return f"{_DISCOVERED_ENDPOINT}?key={api_key}", None
+
+                last_error = f"No models found supporting generateContent in {api_version}"
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")[:250]
+            last_error = f"HTTP {exc.code} listing models: {body}"
+            logger.warning("Listing models failed on %s: %s", api_version, last_error)
+        except Exception as exc:
+            last_error = str(exc)
+            logger.warning("Listing models error on %s: %s", api_version, exc)
+
+    return None, last_error
+
+
+# ---------------------------------------------------------------------------
+# Call Gemini with conversational multi-turn
+# ---------------------------------------------------------------------------
+
 def _ask_gemini(
     context: str,
     question: str,
     history: list[dict[str, str]],
     api_key: str,
 ) -> tuple[str | None, str | None]:
-    """
-    Sends conversation turn to Gemini.
-    Returns (response_text, error_message).
-    """
-    models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
-    last_err = None
-
-    for model in models:
-        text, err = _try_gemini_model(model, context, question, history, api_key)
-        if text:
-            return text, None
-        last_err = err
-
-    return None, last_err
-
-
-def _try_gemini_model(
-    model: str,
-    context: str,
-    question: str,
-    history: list[dict[str, str]],
-    api_key: str,
-) -> tuple[str | None, str | None]:
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{model}:generateContent?key={api_key}"
-    )
+    url, err = _get_generate_url(api_key)
+    if not url:
+        return None, err or "Could not discover any active Gemini model for this API key"
 
     system_instruction = (
-        "You are Mixora, a top-tier music mixing and mastering engineer speaking directly with the producer. "
-        "You have the full technical audio analysis of their track below. "
+        "You are Mixora, a friendly, top-tier audio mixing and mastering engineer speaking directly with the producer. "
+        "You have access to the full technical analysis of their audio file below. "
         "Talk like a real human engineer in a recording studio — conversational, reactive, insightful, and natural. "
         "Answer ANY question they ask: emotional vibe, genre comparison, frequency issues, how to fix things, "
         "arrangement, loudness for Spotify/Apple Music, or creative production ideas. "
-        "Keep each answer to 2-4 spoken sentences so it sounds great over audio. "
-        "Do NOT use markdown, bold, asterisks, bullet points, or lists because your answer is spoken out loud. "
+        "Keep each answer to 2-4 spoken sentences so it sounds great over text-to-speech. "
+        "Do NOT use markdown formatting, bullet points, asterisks, or bold text because your answer is spoken out loud. "
         "Be specific to their actual numbers and observations.\n\n"
         f"{context}"
     )
 
     contents: list[dict] = [
         {"role": "user", "parts": [{"text": system_instruction}]},
-        {"role": "model", "parts": [{"text": "Understood! I'm loaded with the full mix details and ready to chat about the track."}]}
+        {"role": "model", "parts": [{"text": "Understood! I'm loaded with the full mix details and ready to chat naturally about the track."}]}
     ]
 
     for turn in history:
@@ -154,7 +197,7 @@ def _try_gemini_model(
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=15) as response:
+        with urllib.request.urlopen(req, timeout=18) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             candidates = res_data.get("candidates", [])
             if candidates:
@@ -163,13 +206,14 @@ def _try_gemini_model(
                     text = parts[0].get("text", "").strip()
                     if text:
                         return text, None
-            return None, "Empty response from Gemini"
+            return None, "Empty response candidate from Gemini"
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")[:300]
-        logger.warning("Gemini %s HTTP %s: %s", model, exc.code, body)
+        # Reset cached endpoint in case model was decommissioned
+        global _DISCOVERED_ENDPOINT
+        _DISCOVERED_ENDPOINT = None
         return None, f"HTTP {exc.code}: {body}"
     except Exception as exc:
-        logger.warning("Gemini %s error: %s", model, exc)
         return None, str(exc)
 
 
@@ -188,8 +232,7 @@ def answer_question(
     if not api_key:
         return {
             "text": (
-                "To talk with me like a real AI assistant, add your GEMINI_API_KEY in your Render Dashboard. "
-                "Go to mixora-api, click Environment, and add GEMINI_API_KEY with your key from Google AI Studio. "
+                "Please add GEMINI_API_KEY to your Render Dashboard Environment Variables. "
                 "Once saved, I will chat with you naturally in real-time."
             ),
             "source": "no_key",
@@ -206,8 +249,8 @@ def answer_question(
 
     return {
         "text": (
-            f"AI connection error ({error or 'Request timed out'}). "
-            "Please check that your GEMINI_API_KEY in Render is valid and has active quota at aistudio.google.com."
+            f"AI connection note: {error}. "
+            "Please verify your key in Google AI Studio has access to Gemini Flash."
         ),
         "source": "error",
         "used_fields": ["error"],
