@@ -84,59 +84,68 @@ def _get_api_key() -> str:
 # Dynamic Model Discovery: Ask Google which models are active for this key
 # ---------------------------------------------------------------------------
 
-def _get_generate_url(api_key: str) -> tuple[str | None, str | None]:
+def _get_candidate_endpoints(api_key: str) -> list[str]:
     """
-    Dynamically asks Google API for available models supporting generateContent.
-    Picks the best available model (prefers Flash models).
-    Returns (endpoint_url_with_key, error_message).
+    Returns an ordered list of generateContent endpoint URLs to try.
+    Prioritizes models/gemini-3.8-flash (recommended by Google), filters out deprecated models.
     """
     global _DISCOVERED_ENDPOINT
     if _DISCOVERED_ENDPOINT:
-        return f"{_DISCOVERED_ENDPOINT}?key={api_key}", None
+        return [_DISCOVERED_ENDPOINT]
 
-    last_error = None
+    discovered = []
+
     for api_version in ("v1beta", "v1"):
         list_url = f"https://generativelanguage.googleapis.com/{api_version}/models?key={api_key}"
         try:
             req = urllib.request.Request(list_url, method="GET")
-            with urllib.request.urlopen(req, timeout=12) as resp:
+            with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 models = data.get("models", [])
-                candidates = []
                 for m in models:
                     methods = m.get("supportedGenerationMethods", [])
-                    if "generateContent" in methods:
-                        candidates.append((m.get("name", ""), api_version))
-
-                # Preference order:
-                # 1. gemini-2.0-flash
-                # 2. gemini-1.5-flash
-                # 3. any other flash model
-                # 4. gemini-1.5-pro or any gemini
-                # 5. any model with generateContent
-                for pref in ("gemini-2.0-flash", "gemini-1.5-flash", "flash", "gemini-1.5-pro", "gemini"):
-                    for name, ver in candidates:
-                        if pref in name.lower():
-                            _DISCOVERED_ENDPOINT = f"https://generativelanguage.googleapis.com/{ver}/{name}:generateContent"
-                            logger.info("Auto-selected Gemini model: %s via %s", name, ver)
-                            return f"{_DISCOVERED_ENDPOINT}?key={api_key}", None
-
-                if candidates:
-                    name, ver = candidates[0]
-                    _DISCOVERED_ENDPOINT = f"https://generativelanguage.googleapis.com/{ver}/{name}:generateContent"
-                    logger.info("Auto-selected fallback model: %s via %s", name, ver)
-                    return f"{_DISCOVERED_ENDPOINT}?key={api_key}", None
-
-                last_error = f"No models found supporting generateContent in {api_version}"
-        except urllib.error.HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="replace")[:250]
-            last_error = f"HTTP {exc.code} listing models: {body}"
-            logger.warning("Listing models failed on %s: %s", api_version, last_error)
+                    name = m.get("name", "")
+                    # Filter out models that don't support generateContent or are deprecated (like 2.5)
+                    if "generateContent" in methods and "2.5" not in name:
+                        discovered.append((name, api_version))
         except Exception as exc:
-            last_error = str(exc)
-            logger.warning("Listing models error on %s: %s", api_version, exc)
+            logger.warning("Listing models failed on %s: %s", api_version, exc)
 
-    return None, last_error
+    # Sorting priority:
+    # 1. gemini-3.8-flash (current generation)
+    # 2. gemini-3-flash / gemini-3
+    # 3. gemini-2.0-flash
+    # 4. gemini-1.5-flash
+    # 5. any other gemini model
+    def _rank(item: tuple[str, str]) -> int:
+        n = item[0].lower()
+        if "gemini-3.8-flash" in n:
+            return 0
+        if "gemini-3" in n and "flash" in n:
+            return 1
+        if "gemini-2.0-flash" in n:
+            return 2
+        if "gemini-1.5-flash" in n:
+            return 3
+        if "flash" in n:
+            return 4
+        if "gemini" in n:
+            return 5
+        return 6
+
+    discovered.sort(key=_rank)
+
+    endpoints = [
+        f"https://generativelanguage.googleapis.com/{ver}/{name}:generateContent"
+        for name, ver in discovered
+    ]
+
+    # Always ensure models/gemini-3.8-flash is at the very top as recommended by Google API
+    recommended = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
+    if recommended not in endpoints:
+        endpoints.insert(0, recommended)
+
+    return endpoints
 
 
 # ---------------------------------------------------------------------------
@@ -149,9 +158,9 @@ def _ask_gemini(
     history: list[dict[str, str]],
     api_key: str,
 ) -> tuple[str | None, str | None]:
-    url, err = _get_generate_url(api_key)
-    if not url:
-        return None, err or "Could not discover any active Gemini model for this API key"
+    endpoints = _get_candidate_endpoints(api_key)
+    if not endpoints:
+        return None, "No available Gemini endpoints found for this key"
 
     system_instruction = (
         "You are Mixora, a friendly, top-tier audio mixing and mastering engineer speaking directly with the producer. "
@@ -190,31 +199,39 @@ def _ask_gemini(
         }
     }
 
-    try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=18) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            candidates = res_data.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                if parts:
-                    text = parts[0].get("text", "").strip()
-                    if text:
-                        return text, None
-            return None, "Empty response candidate from Gemini"
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")[:300]
-        # Reset cached endpoint in case model was decommissioned
-        global _DISCOVERED_ENDPOINT
-        _DISCOVERED_ENDPOINT = None
-        return None, f"HTTP {exc.code}: {body}"
-    except Exception as exc:
-        return None, str(exc)
+    last_err = None
+    global _DISCOVERED_ENDPOINT
+
+    for endpoint in endpoints:
+        url = f"{endpoint}?key={api_key}"
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=18) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                candidates = res_data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        text = parts[0].get("text", "").strip()
+                        if text:
+                            # Cache the successful endpoint for future turns
+                            _DISCOVERED_ENDPOINT = endpoint
+                            logger.info("Successfully generated response using %s", endpoint)
+                            return text, None
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")[:250]
+            last_err = f"HTTP {exc.code}: {body}"
+            logger.warning("Endpoint %s failed: %s", endpoint, last_err)
+        except Exception as exc:
+            last_err = str(exc)
+            logger.warning("Endpoint %s error: %s", endpoint, last_err)
+
+    return None, last_err
 
 
 # ---------------------------------------------------------------------------
