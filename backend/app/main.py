@@ -196,7 +196,8 @@ def create_app(settings: Settings | None = None, store: AnalysisStore | None = N
         analysis = await run_in_threadpool(request.app.state.store.get_analysis, payload.analysis_id)
         if analysis is None:
             return _error(404, "not_found", "Analysis not found or expired.")
-        answer = answer_question(analysis, payload.question.strip())
+        history = [{"role": t.role, "text": t.text} for t in payload.history]
+        answer = answer_question(analysis, payload.question.strip(), history)
         return answer
 
     return application
