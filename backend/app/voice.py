@@ -9,8 +9,9 @@ from typing import Any
 
 logger = logging.getLogger("mixora.voice")
 
-# Supported models in Google Gemini API
+# Supported models in Google Gemini API (high-availability Flash models)
 PRIMARY_MODELS = (
+    "gemini-3.5-flash-lite",
     "gemini-3.8-flash",
 )
 
