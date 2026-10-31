@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <script>window.API_BASE = "https://mixora-kprj.onrender.com";</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Mixora � AI Mixing Assistant</title>
+<title>Mixora · AI Mixing Assistant</title>
 <style>:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
 --bg:#05060a;--p:#10131a;--p2:#171b25;--p3:#0b0d13;--text:#d5daea;--mute:#7a839e;--cb:#0047ab;--cb2:#2f6bff;--cb3:#8fc4ff}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}*,*::before,*::after{box-sizing:inherit}
@@ -169,18 +169,18 @@ canvas.wf{background:#1a1a1a}input[type=range]{background:#555}input[type=range]
 <header id="bar">
  <div class="brand"><svg><use href="#logo"/></svg>Mixora</div>
  <button class="tbtn on" id="vA" title="View your mix">A</button><button class="tbtn" id="vB" title="View reference">B</button><span class="sep"></span>
- <button class="tbtn" id="tplay" title="Play / pause">?</button><button class="tbtn" id="tstop" title="Stop and rewind">�</button>
+ <button class="tbtn" id="tplay" title="Play / pause">▶</button><button class="tbtn" id="tstop" title="Stop and rewind">■</button>
  <div class="lcd" id="tpos">0:00.0</div><div class="lcd" id="tgen">Dubstep</div>
  <span class="pill" id="pill">Ready for a track</span>
 </header>
 <div id="tabs"><nav class="nav" id="nav"><button data-t="session">Session</button><button data-t="analysis">Analysis</button><button data-t="frequency">Frequency</button><button data-t="stereo">Stereo</button><button data-t="feedback">Feedback</button><button data-t="reference">Reference</button><button data-t="voice">Voice</button></nav></div>
-<section id="dash"><div class="dleft"><svg class="big-logo"><use href="#logo"/></svg><div><h2 id="greet"></h2><p id="dsub">Drop a track, pick a genre and press Analyze Mix.</p><div class="eq" id="eqs"></div></div></div><div id="tiles"><div class="tile off"><div class="k">Peak</div><div class="v">�<small>dBFS</small></div></div><div class="tile off"><div class="k">RMS</div><div class="v">�<small>dBFS</small></div></div><div class="tile off"><div class="k">Loudness</div><div class="v">�<small>LUFS</small></div></div><div class="tile off"><div class="k">Range</div><div class="v">�<small>LU</small></div></div><div class="tile off"><div class="k">Crest</div><div class="v">�<small>dB</small></div></div><div class="tile off"><div class="k">Clipping</div><div class="v">�<small></small></div></div></div></section>
+<section id="dash"><div class="dleft"><svg class="big-logo"><use href="#logo"/></svg><div><h2 id="greet"></h2><p id="dsub">Drop a track, pick a genre and press Analyze Mix.</p><div class="eq" id="eqs"></div></div></div><div id="tiles"><div class="tile off"><div class="k">Peak</div><div class="v">—<small>dBFS</small></div></div><div class="tile off"><div class="k">RMS</div><div class="v">—<small>dBFS</small></div></div><div class="tile off"><div class="k">Loudness</div><div class="v">—<small>LUFS</small></div></div><div class="tile off"><div class="k">Range</div><div class="v">—<small>LU</small></div></div><div class="tile off"><div class="k">Crest</div><div class="v">—<small>dB</small></div></div><div class="tile off"><div class="k">Clipping</div><div class="v">—<small></small></div></div></div></section>
 
 <aside id="browser">
  <div class="sec">Genres</div><div id="genre"></div>
  <div class="sec">Files</div>
- <div class="drop" data-slot="mix" tabindex="0">? Your mix (A)<small>Drop or click � WAV / MP3 � 100 MB</small></div><div id="f-mix"></div><div class="err" id="e-mix"></div>
- <div class="drop" data-slot="ref" tabindex="0">? Reference (B, optional)<small>Comparison only, never a target</small></div><div id="f-ref"></div><div class="err" id="e-ref"></div>
+ <div class="drop" data-slot="mix" tabindex="0">▸ Your mix (A)<small>Drop or click · WAV / MP3 · 100 MB</small></div><div id="f-mix"></div><div class="err" id="e-mix"></div>
+ <div class="drop" data-slot="ref" tabindex="0">▸ Reference (B, optional)<small>Comparison only, never a target</small></div><div id="f-ref"></div><div class="err" id="e-ref"></div>
  <div style="display:flex;gap:6px;margin-top:10px"><button class="btn pri" id="go" disabled style="flex:1">Analyze Mix</button><button class="btn" id="demo" title="Show the UI with mock data">Mock</button></div>
  <input type="file" id="pick" accept=".wav,.mp3,audio/wav,audio/mpeg" class="hid">
  <div id="prog" class="hid"><div class="sec">Analysis</div><div id="stages"></div><div class="bar"><div id="pb"></div></div><div class="err" id="e-an"></div></div>
@@ -193,29 +193,29 @@ canvas.wf{background:#1a1a1a}input[type=range]{background:#555}input[type=range]
  <section class="tab" data-tab="dashboard"><div class="empty">Run an analysis to see measurements, waveforms, the EQ analyzer and feedback here.</div></section>
 
  <section class="tab hid" data-tab="session"><section id="session"><div id="strips"><div class="empty">Load a track, choose a genre and press Analyze Mix.<br>Tracks A and B appear here as session strips.</div></div></section></section>
- <section class="tab hid" data-tab="analysis"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h2 style="margin:0 0 10px">Audio measurements</h2><span class="pill mockTag" style="margin:0">Mock data � swap for /analyze response</span></div>
- <div class="grid g3" id="metrics"></div><h2>Waveforms � click to seek</h2><div id="wfs"></div></section>
+ <section class="tab hid" data-tab="analysis"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h2 style="margin:0 0 10px">Audio measurements</h2><span class="pill mockTag" style="margin:0">Mock data · swap for /analyze response</span></div>
+ <div class="grid g3" id="metrics"></div><h2>Waveforms · click to seek</h2><div id="wfs"></div></section>
 
  <section class="tab hid" data-tab="frequency"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h2 style="margin:0 0 10px">Parametric EQ analyzer</h2><span class="pill mockTag" style="margin:0">Mock band data</span></div>
- <div class="grid eqgrid"><div class="card"><div id="view"><button class="chip on" data-k="A">View A � Your mix</button><button class="chip" data-k="B">View B � Reference</button></div>
+ <div class="grid eqgrid"><div class="card"><div id="view"><button class="chip on" data-k="A">View A · Your mix</button><button class="chip" data-k="B">View B · Reference</button></div>
  <div class="eqwrap"><canvas id="eq"></canvas><div class="tip" id="tip"></div></div><div class="bchips" id="bchips"></div>
- <p style="color:var(--mute);font-size:12px;margin:12px 0 0">Each band shows backend values: filter type, frequency, gain (dB) and Q. The filled spectrum follows playback. Bands: sub 20�60 Hz � bass 60�250 Hz � mid 250 Hz�2 kHz � high-mid 2�6 kHz � highs 6�20 kHz (practical bands, not standards). Bands describe measured tonal balance; they are not instructions to match the reference.</p></div>
+ <p style="color:var(--mute);font-size:12px;margin:12px 0 0">Each band shows backend values: filter type, frequency, gain (dB) and Q. The filled spectrum follows playback. Bands: sub 20–60 Hz · bass 60–250 Hz · mid 250 Hz–2 kHz · high-mid 2–6 kHz · highs 6–20 kHz (practical bands, not standards). Bands describe measured tonal balance; they are not instructions to match the reference.</p></div>
  <div><div class="card" id="side"></div><div class="card" style="margin-top:12px"><h2 style="margin-top:0">Distribution</h2><div id="dist"></div></div></div></div></section>
 
  <section class="tab hid" data-tab="stereo"><div class="grid g3" id="st"></div></section>
- <section class="tab hid" data-tab="feedback"><h2 style="margin-top:0">AI mixing observations � tap a card</h2><div class="grid g3" id="obs"></div></section>
+ <section class="tab hid" data-tab="feedback"><h2 style="margin-top:0">AI mixing observations · tap a card</h2><div class="grid g3" id="obs"></div></section>
  <section class="tab hid" data-tab="reference"><h2 style="margin-top:0">Reference comparison</h2><div class="card" style="overflow-x:auto"><table id="cmp"></table><p style="color:var(--mute);font-size:12px;margin:12px 0 0">Differences give context. A reference is a guide, not a target.</p></div>
- <h2>Revision comparison</h2><div class="card"><p style="margin:0 0 10px;color:var(--mute)">Upload a revised mix to see what changed. Numbers show differences only; they don�t prove a version sounds better.</p><button class="btn" id="rev" disabled>Upload revision</button><input type="file" id="revpick" accept=".wav,.mp3,audio/wav,audio/mpeg" class="hid"><div id="revout" style="margin-top:12px"></div></div></section>
+ <h2>Revision comparison</h2><div class="card"><p style="margin:0 0 10px;color:var(--mute)">Upload a revised mix to see what changed. Numbers show differences only; they don’t prove a version sounds better.</p><button class="btn" id="rev" disabled>Upload revision</button><input type="file" id="revpick" accept=".wav,.mp3,audio/wav,audio/mpeg" class="hid"><div id="revout" style="margin-top:12px"></div></div></section>
  <section class="tab hid" data-tab="voice"><h2 style="margin-top:0">Voice assistant</h2><div class="card">
- <div style="display:flex;gap:16px;align-items:center"><button class="btn mic" id="mic" aria-label="Record"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93V20H9v2h6v-2h-2v-2.07A7 7 0 0 0 19 11h-2z"/></svg></button><div><b id="mst">Tap to ask about this analysis</b><div style="color:var(--mute)">Sent to the backend POST /voice/ask. No AI runs in the browser.</div></div></div>
- <div class="chat inset" id="chat"><div class="bub a">Ask me about your results, e.g. �Why is my sub-bass flagged?�</div></div>
+ <div style="display:flex;gap:16px;align-items:center"><button class="btn mic" id="mic" aria-label="Record"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:block;margin:auto"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg></button><div><b id="mst">Tap mic to speak with Mixora Voice AI</b><div style="color:var(--mute)">Sent to the backend POST /voice/ask. No AI runs in the browser.</div></div></div>
+ <div class="chat inset" id="chat"><div class="bub a">Ask me about your results, e.g. “Why is my sub-bass flagged?”</div></div>
  <div style="display:flex;gap:8px"><input id="q" class="inset" style="flex:1;border:0;color:var(--text);padding:9px 12px;font:inherit;outline:none;min-width:0" placeholder="Or type a question"><button class="btn pri" id="send">Ask</button></div></div></section>
  </div>
 </section>
 </div><div class="toast" id="toast"></div>
 
 <script>
-const API_BASE = window.API_BASE || "http://127.0.0.1:8000";
+const API_BASE = window.API_BASE || "https://mixora-kprj.onrender.com";
 async function apiResult(response){const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.error?.message||`Backend error ${response.status}`);return body;}
 const api = {
  async analyze(mix,ref,genre){ const fd=new FormData(); fd.append("file",mix); if(ref) fd.append("reference",ref); fd.append("genre",genre);
@@ -232,9 +232,9 @@ const MOCK={id:"mock",peak:-0.2,rms:-7.56,lufs:-8.1,lra:4.2,crest:7.36,clipping:
      B:[B("hpf",32,0,.7),B("ls",55,2,.8),B("bell",140,3.1,1.1),B("bell",420,-1.2,.9),B("bell",1700,.8,1),B("bell",3200,2.4,1.2),B("hs",10000,-.8,.8),B("lpf",20000,0,.7)]},
  stereo:{balance:-0.4,correlation:0.82,width:0.31,mono:"OK"},
  ref:{peak:-0.9,rms:-9.1,lufs:-9.4,lra:5.1,crest:8.2,corr:0.88,width:0.27,bands:[31.2,26.1,24.8,17.9]},
- obs:[{t:"Low-end energy concentration",p:"Medium",c:"potential",conf:"Medium",ev:"Sub-bass 36.8% � Bass 24.39%",ex:"A large share of measured energy sits below 250 Hz, which can reduce headroom for mids.",a:"Check kick/bass overlap; try EQ, arrangement changes or sidechain compression."},
- {t:"Clipping indicators detected",p:"High",c:"confirmed",conf:"High",ev:"Peak -0.2 dBFS � clipping flag: true",ex:"Samples reach the digital limit, which may cause audible distortion.",a:"Lower limiter ceiling or input gain; inspect the master bus."},
- {t:"Dense dynamics",p:"Low",c:"potential",conf:"Low",ev:"Crest 7.36 dB � LRA 4.2 LU",ex:"Compact dynamics are common for the genre but may feel fatiguing.",a:"Audition with less limiting at the end of the chain."}]};
+ obs:[{t:"Low-end energy concentration",p:"Medium",c:"potential",conf:"Medium",ev:"Sub-bass 36.8% · Bass 24.39%",ex:"A large share of measured energy sits below 250 Hz, which can reduce headroom for mids.",a:"Check kick/bass overlap; try EQ, arrangement changes or sidechain compression."},
+ {t:"Clipping indicators detected",p:"High",c:"confirmed",conf:"High",ev:"Peak −0.2 dBFS · clipping flag: true",ex:"Samples reach the digital limit, which may cause audible distortion.",a:"Lower limiter ceiling or input gain; inspect the master bus."},
+ {t:"Dense dynamics",p:"Low",c:"potential",conf:"Low",ev:"Crest 7.36 dB · LRA 4.2 LU",ex:"Compact dynamics are common for the genre but may feel fatiguing.",a:"Audition with less limiting at the end of the chain."}]};
 const GENRES=["Dubstep","Bass House","Pop","Rock","Hip Hop","EDM","Techno","Drum & Bass","Trap","Lo-fi","R&B","Indie"];
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const state={mix:null,ref:null,genre:"Dubstep",slot:null,data:null};
@@ -267,14 +267,14 @@ function setFile(slot,f){const err=$("#e-"+slot);err.textContent="";if(!f)return
  if(f.size>100e6)return err.textContent="File exceeds 100 MB.";
  state[slot]=f;renderFile(slot);toast("Loaded "+f.name);const a=new Audio(URL.createObjectURL(f));a.onloadedmetadata=()=>{f.dur=a.duration;renderFile(slot);};}
 function renderFile(slot){const f=state[slot],box=$("#f-"+slot);
- box.innerHTML=f?`<div class="file inset"><div>${escHtml(f.name)}<br><span>${fmt(f.size)}${f.dur?" � "+dur(f.dur):""}</span></div><button class="x" aria-label="Remove">?</button></div>`:"";
+ box.innerHTML=f?`<div class="file inset"><div>${escHtml(f.name)}<br><span>${fmt(f.size)}${f.dur?" · "+dur(f.dur):""}</span></div><button class="x" aria-label="Remove">✕</button></div>`:"";
  if(f)box.querySelector(".x").onclick=()=>{if(confirm("Remove this file?")){state[slot]=null;renderFile(slot);}};
  $("#go").disabled=!state.mix;if(slot==="mix")$("#pill").textContent=f?"Track loaded":"Ready for a track";}
 
 // ---- analysis flow ----
 const STAGES=["Sending audio to backend","Waiting for analysis response"];
 async function run(useMock){
- $("#prog").classList.remove("hid");$("#e-an").textContent="";$("#pill").textContent="Analyzing�";
+ $("#prog").classList.remove("hid");$("#e-an").textContent="";$("#pill").textContent="Analyzing…";
  $("#stages").innerHTML=STAGES.map((s,i)=>`<div class="stage" id="s${i}"><span class="dot"></span>${s}</div>`).join("");
  $("#s0").className="stage done";$("#s1").className="stage on";$("#pb").style.width="45%";
  try{const data=useMock?MOCK:await api.analyze(state.mix,state.ref,state.genre);$("#s1").className="stage done";$("#pb").style.width="100%";state.data=data;resetChatHistory();render(data,useMock);}
@@ -285,12 +285,12 @@ function render(d,mock){
  const M=(k,v,u,c="")=>`<div class="card m lift ${c}"><div class="k">${k}</div><div class="v"><span ${typeof v==="number"?`data-v="${v}"`:""}>${v}</span><small>${u}</small></div></div>`;
  $("#metrics").innerHTML=M("Peak",d.peak,"dBFS")+M("RMS",d.rms,"dBFS")+M("Integrated loudness",d.lufs,"LUFS")+M("Loudness range",d.lra,"LU")+M("Crest factor",d.crest,"dB")+M("Clipping",d.clipping?"Detected":"None","",d.clipping?"warn":"");
  const s=d.stereo,pos=v=>((v+1)/2*100).toFixed(0)+"%",mt=(k,v,sub,val)=>`<div class="card m lift"><div class="k">${k}</div><div class="v">${v}</div><div class="meter inset"><i data-l="${val}"></i></div><div style="color:var(--mute);font-size:12px">${sub}</div></div>`;
- $("#st").innerHTML=mt("L/R balance",s.balance+" dB","Left ? ? Right",pos(s.balance/6))+mt("Correlation",s.correlation,"-1 out of phase � +1 mono",pos(s.correlation))+mt("Stereo width",Math.round(s.width*100)+"%","Mono compatibility: "+s.mono,(s.width*100)+"%");
+ $("#st").innerHTML=mt("L/R balance",s.balance+" dB","Left ← → Right",pos(s.balance/6))+mt("Correlation",s.correlation,"−1 out of phase · +1 mono",pos(s.correlation))+mt("Stereo width",Math.round(s.width*100)+"%","Mono compatibility: "+s.mono,(s.width*100)+"%");
  $("#obs").innerHTML=d.obs.slice(0,3).map(o=>`<div class="card obs lift"><span class="tag ${o.c=="confirmed"?"t-conf":"t-pot"}">${o.c=="confirmed"?"Confirmed issue":"Potential issue"}</span> <span style="font-size:12px;color:var(--mute)">${o.p} priority</span><h3>${o.t}</h3><p><b>Evidence:</b> ${o.ev}</p><div class="more"><p><b>Why:</b> ${o.ex}</p><p><b>Try in your DAW:</b> ${o.a}</p></div><p><b>Confidence:</b> <span style="color:var(--cb3)">${o.conf}</span></p><span class="hint">Tap for details</span></div>`).join("");
  const r=d.ref,rows=[["Peak (dBFS)",d.peak,r?.peak],["RMS (dBFS)",d.rms,r?.rms],["LUFS",d.lufs,r?.lufs],["LRA (LU)",d.lra,r?.lra],["Crest (dB)",d.crest,r?.crest],["Correlation",s.correlation,r?.corr],["Width",s.width,r?.width]].concat(d.bands.map(([n,v],i)=>[n+" %",v,r?.bands?.[i]]));
- $("#cmp").innerHTML="<thead><tr><th>Metric</th><th>Your mix</th><th>Reference</th><th>?</th></tr></thead><tbody>"+rows.map(([n,a,b])=>{const hasReference=Number.isFinite(b),df=hasReference?+(a-b).toFixed(2):null;return`<tr><td>${escHtml(n)}</td><td>${a}</td><td>${hasReference?b:"�"}</td><td class="${df>0?"pos":"neg"}">${hasReference?(df>0?"+":"")+df:"�"}</td>`;}).join("")+"</tbody>";
+ $("#cmp").innerHTML="<thead><tr><th>Metric</th><th>Your mix</th><th>Reference</th><th>Δ</th></tr></thead><tbody>"+rows.map(([n,a,b])=>{const hasReference=Number.isFinite(b),df=hasReference?+(a-b).toFixed(2):null;return`<tr><td>${escHtml(n)}</td><td>${a}</td><td>${hasReference?b:"—"}</td><td class="${df>0?"pos":"neg"}">${hasReference?(df>0?"+":"")+df:"—"}</td>`;}).join("")+"</tbody>";
  setupTracks(d,mock);
- $("#dist").innerHTML=d.bands.map(([n,v],i)=>`<div class="dr"><div class="row"><span>${n}</span><span>${v}%${T.B.avail?" � "+r.bands[i]+"%":""}</span></div><div class="tr inset"><div class="f" data-w="${v*2}" style="background:var(--cb2)"></div></div>${T.B.avail?`<div class="tr inset"><div class="f" data-w="${r.bands[i]*2}" style="background:#5b6786"></div></div>`:""}</div>`).join("")+`<p style="font-size:12px;color:var(--mute);margin:0">Blue: your mix${T.B.avail?" � grey: reference":""}</p>`;
+ $("#dist").innerHTML=d.bands.map(([n,v],i)=>`<div class="dr"><div class="row"><span>${n}</span><span>${v}%${T.B.avail?" · "+r.bands[i]+"%":""}</span></div><div class="tr inset"><div class="f" data-w="${v*2}" style="background:var(--cb2)"></div></div>${T.B.avail?`<div class="tr inset"><div class="f" data-w="${r.bands[i]*2}" style="background:#5b6786"></div></div>`:""}</div>`).join("")+`<p style="font-size:12px;color:var(--mute);margin:0">Blue: your mix${T.B.avail?" · grey: reference":""}</p>`;
  show("analysis");$$("#metrics [data-v]").forEach(countUp);
  setTimeout(()=>{$$(".f").forEach(f=>f.style.width=f.dataset.w+"%");$$(".meter i").forEach(i=>i.style.left=`calc(${i.dataset.l} - 3px)`);},200);}
 $("#obs").onclick=e=>{const c=e.target.closest(".obs");if(c)c.classList.toggle("open");};
@@ -305,7 +305,7 @@ function setupTracks(d,mock){
   else{const el=new Audio(URL.createObjectURL(f));el.preload="auto";el.onloadedmetadata=()=>t.dur=el.duration;el.onended=()=>{t.playing=false;};t.el=el;
    f.arrayBuffer().then(buf=>(ctx||(ctx=new(window.AudioContext||window.webkitAudioContext)())).decodeAudioData(buf)).then(ab=>{const ch=ab.getChannelData(0),n=700,sz=Math.floor(ch.length/n),p=[];let mx=0;
     for(let i=0;i<n;i++){let m=0;for(let j=i*sz;j<(i+1)*sz;j+=16)m=Math.max(m,Math.abs(ch[j]));p.push(m);mx=Math.max(mx,m);}t.peaks=p.map(v=>v/(mx||1));}).catch(()=>{t.peaks=fakePeaks(7);});}});
- const plHTML=(k,w)=>`<div class="pl" data-k="${k}"><div class="plh"><button class="btn pb" data-act="play" aria-label="Play or pause">?</button><span class="ab">${k}</span><div class="pn"><b class="nm"></b><span class="tm">0:00 / 0:00</span></div></div>${w?'<canvas class="wf"></canvas>':""}<input type="range" class="seek" min="0" max="1000" value="0" aria-label="Seek"></div>`;
+ const plHTML=(k,w)=>`<div class="pl" data-k="${k}"><div class="plh"><button class="btn pb" data-act="play" aria-label="Play or pause">▶</button><span class="ab">${k}</span><div class="pn"><b class="nm"></b><span class="tm">0:00 / 0:00</span></div></div>${w?'<canvas class="wf"></canvas>':""}<input type="range" class="seek" min="0" max="1000" value="0" aria-label="Seek"></div>`;
  $("#wfs").innerHTML=plHTML("A",1)+plHTML("B",1);$("#side").innerHTML=`<h2 style="margin-top:0">Players</h2>`+plHTML("A",0)+plHTML("B",0);
  const sp=a=>{const n=300;return Array.from({length:n},(_,j)=>{const u=j/(n-1)*(a.length-1),i=Math.floor(u),f=u-i;return a[i]*(1-f)+(a[Math.min(i+1,a.length-1)])*f;});};
  T.A.sp=sp(d.spectrum.A);T.B.sp=d.spectrum.B?sp(d.spectrum.B):[];T.A.eq=d.eq.A;T.B.eq=d.eq.B||null;active="A";setView("A");}
@@ -327,7 +327,7 @@ const BC=["#22d3ee","#14b8a6","#facc15","#fb923c","#4ade80","#a78bfa","#f472b6",
 let cur=null,disp=new Float32Array(300),hov=-1;
 function setView(k){if(!T[k].avail||!T[k].eq){if(k==="B")toast("No reference analysis available");return;}active=k;$$("#view .chip").forEach(c=>c.classList.toggle("on",c.dataset.k===k));
  if(!cur)cur=T[k].eq.map(b=>({...b}));
- $("#bchips").innerHTML=T[k].eq.map((b,i)=>`<div class="bc" data-i="${i}" style="--c:${BC[i]}"><b>${i+1} � ${BN[i]}</b>${b.f>=1000?(b.f/1000).toFixed(1)+" kHz":Math.round(b.f)+" Hz"}${b.t==="hpf"||b.t==="lpf"?"":` � ${b.g>0?"+":""}${b.g} dB`} � Q ${b.q}</div>`).join("");}
+ $("#bchips").innerHTML=T[k].eq.map((b,i)=>`<div class="bc" data-i="${i}" style="--c:${BC[i]}"><b>${i+1} · ${BN[i]}</b>${b.f>=1000?(b.f/1000).toFixed(1)+" kHz":Math.round(b.f)+" Hz"}${b.t==="hpf"||b.t==="lpf"?"":` · ${b.g>0?"+":""}${b.g} dB`} · Q ${b.q}</div>`).join("");}
 const resp=(b,x)=>{const l=Math.log(x/b.f);switch(b.t){case"hpf":return-Math.min(18,12*Math.max(0,-l/Math.LN2));case"lpf":return-Math.min(18,12*Math.max(0,l/Math.LN2));
  case"ls":return b.g/(1+Math.exp(l*3));case"hs":return b.g/(1+Math.exp(-l*3));default:return b.g*Math.exp(-l*l/(2*Math.pow(.7/b.q,2)));}};
 const X0=12,X1=852,Y0=40,Y1=400,fx=f=>X0+(Math.log10(f)-Math.log10(20))/3*(X1-X0),dy=db=>Y0+(18-db)/36*(Y1-Y0);
@@ -357,19 +357,19 @@ function drawEQ(now){const c=$("#eq"),w=c.clientWidth;if(!w||!cur)return;const d
   g.fillStyle="#fff";g.font="700 12px system-ui";g.textAlign="center";g.fillText(i+1,x,y+4);b._x=x;b._y=y;});}
 $("#eq").onpointermove=e=>{if(!cur)return;const r=$("#eq").getBoundingClientRect(),x=(e.clientX-r.left)/r.width*900,y=(e.clientY-r.top)/r.width*900;
  hov=cur.findIndex(b=>Math.hypot(b._x-x,b._y-y)<18);$$(".bc").forEach((c,i)=>c.classList.toggle("hv",i===hov));
- const t=$("#tip");if(hov>=0){const b=T[active].eq[hov];t.textContent=`${hov+1} � ${BN[hov]} � ${b.f>=1000?(b.f/1000).toFixed(1)+" kHz":b.f+" Hz"}${b.t==="hpf"||b.t==="lpf"?"":` � ${b.g>0?"+":""}${b.g} dB`} � Q ${b.q}`;
+ const t=$("#tip");if(hov>=0){const b=T[active].eq[hov];t.textContent=`${hov+1} · ${BN[hov]} · ${b.f>=1000?(b.f/1000).toFixed(1)+" kHz":b.f+" Hz"}${b.t==="hpf"||b.t==="lpf"?"":` · ${b.g>0?"+":""}${b.g} dB`} · Q ${b.q}`;
   t.style.left=Math.min(e.clientX-r.left+14,r.width-230)+"px";t.style.top=(e.clientY-r.top-34)+"px";t.style.opacity=1;}else t.style.opacity=0;};
 $("#eq").onpointerleave=()=>{hov=-1;$("#tip").style.opacity=0;$$(".bc").forEach(c=>c.classList.remove("hv"));};
 
 // ---- waveform + UI sync loop ----
 function drawWave(k){const c=$(`.pl[data-k=${k}] canvas.wf`);if(!c)return;const t=T[k],w=c.clientWidth,dpr=devicePixelRatio||1;if(c.width!==Math.round(w*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(84*dpr);}
- const g=c.getContext("2d"),W=c.width,H=c.height;g.clearRect(0,0,W,H);if(!t.avail){return;}const p=t.peaks;if(!p){g.fillStyle="#7b84a0";g.font=`${12*dpr}px system-ui`;g.fillText("Decoding waveform�",10*dpr,H/2);return;}
+ const g=c.getContext("2d"),W=c.width,H=c.height;g.clearRect(0,0,W,H);if(!t.avail){return;}const p=t.peaks;if(!p){g.fillStyle="#7b84a0";g.font=`${12*dpr}px system-ui`;g.fillText("Decoding waveform…",10*dpr,H/2);return;}
  const prog=(tGet(t)/(t.dur||1)),n=p.length,bw=W/n;for(let i=0;i<n;i++){const h=Math.max(2*dpr,p[i]*H*.46),x=i*bw,done=i/n<prog;g.fillStyle=done?"#8fc4ff":"#4a5560";g.fillRect(x,H/2-h,Math.max(1,bw-1),h*2);}
  g.fillStyle="#fff";g.shadowColor="#8fc4ff";g.shadowBlur=8*dpr;g.fillRect(prog*W-1,0,2*dpr,H);g.shadowBlur=0;}
 let last=performance.now();
 (function loop(now){const dt=(now-last)/1000;last=now;
  ["A","B"].forEach(k=>{const t=T[k];if(!t.avail)return;if(!t.el&&t.playing){t.t+=dt;if(t.t>=t.dur){t.t=0;t.playing=false;}}
-  $$(`.pl[data-k=${k}]`).forEach(pl=>{pl.classList.toggle("act",active===k);const b=pl.querySelector(".pb");b.textContent=t.playing?"??":"?";b.classList.toggle("on",t.playing);b.disabled=!t.avail;
+  $$(`.pl[data-k=${k}]`).forEach(pl=>{pl.classList.toggle("act",active===k);const b=pl.querySelector(".pb");b.textContent=t.playing?"❚❚":"▶";b.classList.toggle("on",t.playing);b.disabled=!t.avail;
    pl.querySelector(".nm").textContent=t.name;pl.querySelector(".tm").textContent=dur(tGet(t))+" / "+dur(t.dur||0);const s=pl.querySelector(".seek");if(document.activeElement!==s)s.value=tGet(t)/(t.dur||1)*1000;});});
  if(T.B.name&&!T.B.avail)$$(`.pl[data-k=B] .nm`).forEach(n=>n.textContent="No reference loaded");
  if(tab==="analysis"){drawWave("A");drawWave("B");}if(tab==="frequency")drawEQ(now);
@@ -378,16 +378,17 @@ let last=performance.now();
 $("#go").onclick=()=>run(false);$("#demo").onclick=()=>run(true);
 $("#rev").onclick=()=>$("#revpick").click();
 $("#revpick").onchange=async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;if(!/\.(wav|mp3)$/i.test(file.name))return toast("Use a WAV or MP3 revision");if(file.size>100e6)return toast("File exceeds 100 MB");
- const out=$("#revout");out.textContent="Comparing revision�";try{const result=await api.compare(state.data.id,file,state.genre);const rows=result.metrics.map(x=>[x.name,x.previous,x.revised,x.delta,x.unit]).concat(result.bands.map(x=>[x.name,x.previous,x.revised,x.delta,"%"]));out.innerHTML="<table><thead><tr><th>Metric</th><th>Previous</th><th>Revised</th><th>?</th></tr></thead><tbody>"+rows.map(([n,a,b,d,u])=>`<tr><td>${escHtml(n)}</td><td>${a} ${escHtml(u)}</td><td>${b} ${escHtml(u)}</td><td>${d>0?"+":""}${d}</td></tr>`).join("")+`<tr><td>Clipping</td><td>${result.clipping.previous?"Detected":"None"}</td><td>${result.clipping.revised?"Detected":"None"}</td><td>Numerical status</td></tr></tbody></table><p style="color:var(--mute);font-size:12px">${escHtml(result.note)}</p><p style="color:var(--mute);font-size:12px">Observation changes: ${result.observation_changes.map(x=>`${escHtml(x.id)} (${escHtml(x.status)})`).join(" � ")||"None"}</p>`;}
+ const out=$("#revout");out.textContent="Comparing revision…";try{const result=await api.compare(state.data.id,file,state.genre);const rows=result.metrics.map(x=>[x.name,x.previous,x.revised,x.delta,x.unit]).concat(result.bands.map(x=>[x.name,x.previous,x.revised,x.delta,"%"]));out.innerHTML="<table><thead><tr><th>Metric</th><th>Previous</th><th>Revised</th><th>Δ</th></tr></thead><tbody>"+rows.map(([n,a,b,d,u])=>`<tr><td>${escHtml(n)}</td><td>${a} ${escHtml(u)}</td><td>${b} ${escHtml(u)}</td><td>${d>0?"+":""}${d}</td></tr>`).join("")+`<tr><td>Clipping</td><td>${result.clipping.previous?"Detected":"None"}</td><td>${result.clipping.revised?"Detected":"None"}</td><td>Numerical status</td></tr></tbody></table><p style="color:var(--mute);font-size:12px">${escHtml(result.note)}</p><p style="color:var(--mute);font-size:12px">Observation changes: ${result.observation_changes.map(x=>`${escHtml(x.id)} (${escHtml(x.status)})`).join(" · ")||"None"}</p>`;}
  catch(error){out.textContent="Revision comparison failed: "+error.message;}};
 
 function say(text,who){const bubble=document.createElement("div");bubble.className="bub "+who;bubble.textContent=text;$("#chat").append(bubble);$("#chat").scrollTop=$("#chat").scrollHeight;return bubble;}
-// -- Conversation history (per analysis session) --------------------------
-let chatHistory = [];  // [{role:"user",text:""},{role:"assistant",text:""}]
+
+// ── Conversation history (per analysis session) ──────────────────────────
+let chatHistory = [];
 
 function resetChatHistory() { chatHistory = []; }
 
-// -- Text-to-speech using best available browser voice --------------------
+// ── Browser Text-to-Speech (TTS) ─────────────────────────────────────────
 function speakAnswer(text, onEndCb) {
   if (!('speechSynthesis' in window)) { if (onEndCb) onEndCb(); return; }
   window.speechSynthesis.cancel();
@@ -410,33 +411,28 @@ if ('speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
 }
 
-// -- Ask question (sends history for multi-turn conversation) --------------
+// ── Multi-turn ask function ──────────────────────────────────────────────
 async function ask(question, autoListen) {
   const text = question.trim();
   if (!text) return;
   if (!state.data?.id) return toast("Analyze a mix first");
   say(text, "u");
-  const answer = say("Mixora is thinking...", "a");
+  const answer = say("Mixora is thinking…", "a");
   $("#send").disabled = true;
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
-  // Add user turn to history before sending
   chatHistory.push({ role: "user", text: text });
-  // Keep last 10 turns to stay within token limits
   if (chatHistory.length > 20) chatHistory = chatHistory.slice(chatHistory.length - 20);
 
   try {
-    const response = await api.ask(state.data.id, text, chatHistory.slice(0, -1)); // send prior history
+    const response = await api.ask(state.data.id, text, chatHistory.slice(0, -1));
     const replyText = response.text || "I could not generate a response.";
     answer.textContent = replyText;
-
-    // Add assistant turn to history
     chatHistory.push({ role: "assistant", text: replyText });
 
     if (response.audio_url) {
       new Audio(response.audio_url).play();
     } else {
-      // Speak reply, then auto-restart mic for continuous conversation
       speakAnswer(replyText, autoListen ? () => {
         setTimeout(() => {
           if (recognition === null) startListening();
@@ -445,7 +441,7 @@ async function ask(question, autoListen) {
     }
   } catch (error) {
     answer.textContent = "Voice AI error: " + error.message;
-    chatHistory.pop(); // remove the failed user turn
+    chatHistory.pop();
   } finally {
     $("#send").disabled = false;
   }
@@ -454,16 +450,16 @@ async function ask(question, autoListen) {
 $("#send").onclick = () => { const q = $("#q").value; $("#q").value = ""; ask(q, false); };
 $("#q").onkeydown = e => { if (e.key === "Enter") { $("#send").click(); } };
 
-// -- Microphone / Continuous Conversation Loop -----------------------------
+// ── Continuous speech recognition loop ──────────────────────────────────
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 
 function startListening() {
   if (!SpeechRecognition) {
-    $("#mst").textContent = "Speech capture unavailable. Use the text box below.";
+    $("#mst").textContent = "Speech capture is unavailable in this browser. Type below.";
     return;
   }
-  if (recognition) return; // already listening
+  if (recognition) return;
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
   recognition = new SpeechRecognition();
@@ -474,14 +470,14 @@ function startListening() {
 
   recognition.onstart = () => {
     $("#mic").classList.add("rec");
-    $("#mst").textContent = "Listening... speak your question";
+    $("#mst").textContent = "Listening… speak your question";
   };
   recognition.onresult = e => {
     const heard = e.results[0][0].transcript;
-    $("#mst").textContent = "You said: \"" + heard + "\"";
+    $("#mst").textContent = "You: \"" + heard + "\"";
     recognition = null;
     $("#mic").classList.remove("rec");
-    ask(heard, true); // true = auto-listen again after Mixora replies
+    ask(heard, true); // true = auto-listen again after reply
   };
   recognition.onend = () => {
     if (recognition) { recognition = null; }
@@ -494,7 +490,7 @@ function startListening() {
     if (e.error === "no-speech") {
       $("#mst").textContent = "No speech heard. Tap mic to try again.";
     } else {
-      $("#mst").textContent = "Mic error: " + e.error + ". Check browser permission.";
+      $("#mst").textContent = "Mic: " + e.error + ". Check browser permission.";
     }
   };
   recognition.start();
@@ -513,15 +509,15 @@ $("#mic").onclick = () => {
 };
 
 function fillStrips(d){const reference=d.ref||null;const column=(key,index,label,color,peak,rms,values)=>{const track=T[key],available=track.avail&&Array.isArray(values);
- return `<div class="col ${available?"":"off"}" data-k="${key}" style="--cc:${color}"><div class="ch" style="background:${color}" data-view="${key}">${index} � ${label}</div>
- <div class="slot play" data-play="${key}"><span class="tri">?</span><span class="sn">${available?escHtml(track.name):"No reference loaded"}</span></div>
- ${d.bands.map(([name],i)=>`<div class="slot" style="--w:${available?values[i]*2:0}%"><span class="sn">${escHtml(name)}</span><span class="sv">${available?values[i]+"%":"�"}</span></div>`).join("")}
- <div class="mx"><div><div class="pk">${available?peak:"�"}</div><div class="mt"><i style="height:${available?Math.max(2,Math.min(100,(60+rms)/60*100)):0}%"></i><u style="bottom:${available?Math.max(2,Math.min(100,(60+peak)/60*100)):0}%"></u></div></div><div class="sc"><span>0</span><span>12</span><span>24</span><span>36</span><span>48</span><span>60</span></div><div class="nb" data-view="${key}">${index}</div></div></div>`;};
+ return `<div class="col ${available?"":"off"}" data-k="${key}" style="--cc:${color}"><div class="ch" style="background:${color}" data-view="${key}">${index} · ${label}</div>
+ <div class="slot play" data-play="${key}"><span class="tri">▶</span><span class="sn">${available?escHtml(track.name):"No reference loaded"}</span></div>
+ ${d.bands.map(([name],i)=>`<div class="slot" style="--w:${available?values[i]*2:0}%"><span class="sn">${escHtml(name)}</span><span class="sv">${available?values[i]+"%":"—"}</span></div>`).join("")}
+ <div class="mx"><div><div class="pk">${available?peak:"—"}</div><div class="mt"><i style="height:${available?Math.max(2,Math.min(100,(60+rms)/60*100)):0}%"></i><u style="bottom:${available?Math.max(2,Math.min(100,(60+peak)/60*100)):0}%"></u></div></div><div class="sc"><span>0</span><span>12</span><span>24</span><span>36</span><span>48</span><span>60</span></div><div class="nb" data-view="${key}">${index}</div></div></div>`;};
  const master=[["Loudness",d.lufs+" LUFS"],["Range",d.lra+" LU"],["Crest",d.crest+" dB"],["Clipping",d.clipping?"Detected":"None",d.clipping],["Correlation",d.stereo.correlation],["Width",Math.round(d.stereo.width*100)+"%"],["Mono",d.stereo.mono],["Genre",d.meta?.genre||state.genre]];
- $("#strips").innerHTML=column("A",1,"Your mix","#8fc4ff",d.peak,d.rms,d.bands.map(pair=>pair[1]))+column("B",2,"Reference","#f2ee73",reference?.peak,reference?.rms,reference?.bands)+`<div class="col master"><div class="ch" style="background:#7dfdb1;color:#111;cursor:default">Master � Analysis</div>${master.map(([name,value,warning],i)=>`<div class="sr ${warning?"hot":""}"><span class="n">${i+1}</span><span>${name}</span><b>${value}</b></div>`).join("")}<p style="color:var(--mute);font-size:11px;padding:10px 12px;margin:0">Meters: bar = RMS, white tick = peak (dBFS).</p></div>`;}
+ $("#strips").innerHTML=column("A",1,"Your mix","#8fc4ff",d.peak,d.rms,d.bands.map(pair=>pair[1]))+column("B",2,"Reference","#f2ee73",reference?.peak,reference?.rms,reference?.bands)+`<div class="col master"><div class="ch" style="background:#7dfdb1;color:#111;cursor:default">Master · Analysis</div>${master.map(([name,value,warning],i)=>`<div class="sr ${warning?"hot":""}"><span class="n">${i+1}</span><span>${name}</span><b>${value}</b></div>`).join("")}<p style="color:var(--mute);font-size:11px;padding:10px 12px;margin:0">Meters: bar = RMS, white tick = peak (dBFS).</p></div>`;}
 function fillTiles(d){const tiles=[["Peak",d.peak,"dBFS","#8fc4ff"],["RMS",d.rms,"dBFS","#f2ee73"],["Loudness",d.lufs,"LUFS","#e07de0"],["Range",d.lra,"LU","#f598a8"],["Crest",d.crest,"dB","#5fd8d0"],["Clipping",d.clipping?"Detected":"None","","#f5a142"]];
  $("#tiles").innerHTML=tiles.map(([name,value,unit,color],i)=>`<div class="tile" style="--c:${color};animation-delay:${i*70}ms"><div class="k">${name}</div><div class="v"><span ${typeof value==="number"?`data-v="${value}"`:""}>${value}</span><small>${unit}</small></div></div>`).join("");
- $$("#tiles [data-v]").forEach(countUp);$("#dsub").textContent=`${state.mix?.name||"Track"} � ${state.genre} � ${d.meta?.profile||"analysis"}`;}
+ $$("#tiles [data-v]").forEach(countUp);$("#dsub").textContent=`${state.mix?.name||"Track"} · ${state.genre} · ${d.meta?.profile||"analysis"}`;}
 const renderWithDashboard=render;render=function(data,isMock){renderWithDashboard(data,isMock);fillStrips(data);fillTiles(data);};
 const ft=seconds=>Math.floor(seconds/60)+":"+(seconds%60).toFixed(1).padStart(4,"0");
 document.addEventListener("click",e=>{const play=e.target.closest("[data-play]"),view=e.target.closest("[data-view]");
@@ -531,7 +527,7 @@ $("#tplay").onclick=()=>state.data?toggle(active):toast("Analyze a mix first");
 $("#tstop").onclick=()=>{if(!state.data)return;stopAll();["A","B"].forEach(key=>{if(T[key].avail)seekTo(key,0);});};
 $("#vA").onclick=()=>state.data?setView("A"):toast("Analyze a mix first");
 $("#vB").onclick=()=>{if(!state.data)return toast("Analyze a mix first");if(T.B.avail)setView("B");else toast("No reference loaded");};
-setInterval(()=>{$("#tgen").textContent=state.genre;if(!state.data)return;const track=T[active];$("#tpos").textContent=ft(tGet(track)||0);$("#tplay").textContent=track.playing?"??":"?";$("#tplay").classList.toggle("on",!!track.playing);
+setInterval(()=>{$("#tgen").textContent=state.genre;if(!state.data)return;const track=T[active];$("#tpos").textContent=ft(tGet(track)||0);$("#tplay").textContent=track.playing?"❚❚":"▶";$("#tplay").classList.toggle("on",!!track.playing);
  $("#vA").classList.toggle("on",active==="A");$("#vB").classList.toggle("on",active==="B");$$(".col[data-k]").forEach(column=>{column.classList.toggle("act",column.dataset.k===active);column.classList.toggle("playing",!!T[column.dataset.k].playing);});},100);
 $("#nav").addEventListener("click",e=>{if(e.target.closest("button")&&state.data)setTimeout(()=>$("#detail").scrollIntoView({behavior:"smooth",block:"start"}),30);});
 </script>
