@@ -1,0 +1,68 @@
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Database & Storage
+*.sqlite3
+*.db
+backend/data/
+/data/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+!.env.production
+!.env.example
+!backend/.env.example
+
+# Audio & Temporary Media Files
+*.wav
+*.mp3
+*.mpeg
+*.flac
+*.aac
+*.m4a
+*.ogg
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Node & Frontend (if applicable)
+node_modules/
+.npm/

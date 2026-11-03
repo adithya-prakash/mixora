@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  mixora:
+    build: .
+    container_name: mixora-service
+    ports:
+      - "8000:8000"
+    environment:
+      - ALLOWED_ORIGINS=*
+      - MAX_UPLOAD_MB=100
+      - MAX_DURATION_S=900
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    volumes:
+      - mixora_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  mixora_data:
